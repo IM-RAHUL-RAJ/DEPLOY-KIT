@@ -263,6 +263,21 @@ services:
     ports:
       - "${FRONTEND_PORT:-4200}:80"
 
+  # Kafka UI - visualize topics, messages, and consumers
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    <<: *restart
+    environment:
+      KAFKA_CLUSTERS_0_NAME: etp-kafka
+      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:29092
+      KAFKA_CLUSTERS_0_SCHEMAREGISTRY: http://kafka:8081
+    ports:
+      - "8888:8080"
+    depends_on:
+      - kafka
+    networks:
+      default: null
+
 volumes:
   pgdata:
   kafkadata:
