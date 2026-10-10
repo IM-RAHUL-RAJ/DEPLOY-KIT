@@ -1,0 +1,147 @@
+# Order service (Trade REST API).
+#
+# Every host, port and URL comes from an environment variable (Application/.env) or,
+# when that is not set, from the shared Application/Config/application.yml. Nothing
+# environment-specific is written here: change Config or .env, never this file.
+
+server:
+  port: ${ORDER_SERVICE_PORT:${services.order.port}}
+
+spring:
+  application:
+    name: trade-api
+  # Load the shared Config/application.yml and Application/.env whichever directory the
+  # service is started from (Application/, Services/order-service/, a container with
+  # SHARED_CONFIG set). A later import wins, so .env overrides Config, and real
+  # environment variables override both. All are optional: a container that passes
+  # everything as environment variables needs neither file.
+  config:
+    import:
+      - optional:file:${SHARED_CONFIG:../../Config/application.yml}
+      - optional:file:../Config/application.yml
+      - optional:file:Config/application.yml
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+      - optional:file:../../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:${database.host}}:${DB_PORT:${database.port}}/${DB_NAME:${database.name}}?currentSchema=${PG_SCHEMA:${database.schema}}
+    username: ${DB_USER:${database.user}}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:${kafka.host}:${kafka.port}}
+    producer:
+      # The producer sends JSON it has already serialised, so the value is a plain
+      # String. A JsonSerializer here would wrap it in a second layer of quotes.
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.apache.kafka.common.serialization.StringSerializer
+      acks: all
+      retries: 2147483647
+      properties:
+        enable.idempotence: true
+        max.in.flight.requests.per.connection: 5
+        # delivery.timeout.ms stays at its default (120 s): Kafka requires it to be
+        # at least linger.ms + request.timeout.ms, and refuses to build a producer
+        # otherwise, which would fail every publish.
+        linger.ms: 10
+        batch.size: 16384
+        # A publish waits at most this long for an unreachable broker. Publishing runs
+        # after an order commits, inside the HTTP request: the default (60 s) held the
+        # response long enough for automated orders to time out while they were placed.
+        max.block.ms: ${KAFKA_MAX_BLOCK_MS:${kafka.max-block-ms}}
+  mail:
+    host: ${SMTP_HOST:${email.smtp-host}}
+    port: ${SMTP_PORT:${email.smtp-port}}
+    username: ${SMTP_USER:}
+    password: ${SMTP_PASS:}
+    from: ${SMTP_FROM:}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  type-aliases-package: com.trading.tradeapi.dto,com.trading.tradeapi.entity
+  configuration:
+    map-underscore-to-camel-case: true
+
+# No default secret: the service refuses to start without one (see JwtService).
+jwt:
+  secret: ${JWT_SECRET:}
+  issuer: ${JWT_ISSUER:${auth.jwt-issuer}}
+
+# The browser origin that calls this API with credentials: the frontend's address.
+cors:
+  allowed-origins: ${CORS_ALLOWED_ORIGINS:${frontend.url}:${frontend.port}}
+
+# Kafka topic names, from Config (kafka.topics) unless overridden.
+topics:
+  orders: ${ORDERS_TOPIC:${kafka.topics.orders}}
+  trade-events: ${TRADE_EVENTS_TOPIC:${kafka.topics.trade-events}}
+  market-data: ${MARKET_DATA_TOPIC:${kafka.topics.market-data}}
+
+# Market data. This service never calls Fauxnance and holds no key: the market-data
+# poller in the Trade Executor fetches quotes and candles and stores them, and this
+# service reads them (see the marketdata package). A symbol nobody has asked about
+# is requested through trading.market_interest and waited for briefly.
+market:
+  await-ms: ${MARKET_AWAIT_MS:6000}
+  view-interest-minutes: ${MARKET_VIEW_INTEREST_MINUTES:30}
+  health-fresh-minutes: ${MARKET_HEALTH_FRESH_MINUTES:120}
+
+# Order notifications: the sweep that records an order's outcome when its Kafka event never
+# arrived (see OrderOutcomeSweeper).
+notifications:
+  order-sweep:
+    interval-ms: ${NOTIFICATION_SWEEP_INTERVAL_MS:${notifications.sweep-interval-ms}}
+
+# Automated trading (price targets).
+strategy:
+  sweep:
+    interval-ms: ${STRATEGY_SWEEP_INTERVAL_MS:${strategy.sweep-interval-ms}}
+  # The order API this service places automated orders through. Empty means itself:
+  # services.order.url (Config) on the port it bound.
+  trade-api-url: ${STRATEGY_TRADE_API_URL:}
+  order-timeout: ${STRATEGY_ORDER_TIMEOUT_MS:${strategy.order-timeout-ms}}
+
+# Reference FX rates: units of the currency per 1 unit of the base (USD).
+# Fauxnance exposes no FX endpoint, so these mirror the executor service and the
+# frontend CurrencyService. Used to re-denominate a live quote into the account's
+# ledger currency before a market order is admitted and priced.
+# Every currency the registration country catalogue can open an account in is
+# listed here. A currency with no rate is refused with FX-422 rather than priced
+# at 1.0, so a missing rate can never decide an order on a fictitious conversion.
+fx:
+  base: USD
+  rates:
+    USD: 1
+    EUR: 0.92
+    GBP: 0.79
+    INR: 83.3
+    JPY: 156.5
+    AUD: 1.5
+    CAD: 1.36
+    SGD: 1.34
+    HKD: 7.82
+    CNY: 7.24
+    KRW: 1345.0
+    AED: 3.67
+    ZAR: 18.4
+    CHF: 0.89
+    SEK: 10.5
+    NOK: 10.7
+    DKK: 6.87
+    BRL: 5.05
+    MXN: 16.8
+    ILS: 3.72
+    TRY: 32.5
+
+# Groq LLM API for the trading assistant. The URL and model are in Config (llm).
+groq:
+  api-key: ${GROQ_API_KEY:}
+  base-url: ${GROQ_BASE_URL:${llm.base-url}}
+  model: ${GROQ_MODEL:${llm.model}}
+  timeout-seconds: ${GROQ_TIMEOUT_SECONDS:${llm.timeout-seconds}}

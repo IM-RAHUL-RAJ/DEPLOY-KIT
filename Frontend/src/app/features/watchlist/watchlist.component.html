@@ -1,0 +1,228 @@
+<div class="ext-page watchlist-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">My Watchlists</h1>
+      <p class="page-subtitle">Keep as many lists as you need, and drag an instrument onto another list's tab to move it</p>
+    </div>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <span class="icon">!</span>
+      <span>{{ errorMessage() }}</span>
+    </div>
+  }
+  @if (successMessage()) {
+    <div class="success-banner" role="status">
+      <span class="icon">✓</span>
+      <span>{{ successMessage() }}</span>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="card state-card inline">
+      <span class="spinner"></span>
+      <span>Loading watchlists…</span>
+    </div>
+  } @else if (!hasLists()) {
+    <div class="card state-card">
+      <svg viewBox="0 0 24 24">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <path d="M3 9h18M9 21V9" />
+      </svg>
+      <p class="state-title">You have no watchlists yet</p>
+      <p>Create one, then add the instruments you want to follow.</p>
+      <div class="create-list">
+        <input
+          id="new-list-name"
+          type="text"
+          placeholder="List name, e.g. Tech leaders"
+          aria-label="New list name"
+          [(ngModel)]="newListName"
+          (keyup.enter)="createList()"
+          maxlength="40"
+        />
+        <button class="btn-accent" (click)="createList()" [disabled]="creating()">
+          {{ creating() ? 'Creating…' : 'Create list' }}
+        </button>
+      </div>
+    </div>
+  } @else {
+    <div class="lists-toolbar">
+      <div class="lists-tabs" role="tablist" aria-label="Watchlists">
+        @for (list of lists(); track list.watchlistId) {
+          <button
+            type="button"
+            role="tab"
+            class="list-tab"
+            [attr.aria-selected]="selected()?.watchlistId === list.watchlistId"
+            [class.active]="selected()?.watchlistId === list.watchlistId"
+            [class.drop-target]="dropTargetId() === list.watchlistId"
+            (click)="select(list.watchlistId)"
+            (dragover)="$event.preventDefault(); onDragOver(list)"
+            (dragleave)="dropTargetId.set(null)"
+            (drop)="$event.preventDefault(); onDrop(list)"
+          >
+            <span class="list-tab-name">{{ list.name }}</span>
+            <span class="list-tab-count">{{ list.instruments.length }}</span>
+          </button>
+        }
+      </div>
+      <div class="create-list">
+        <input
+          type="text"
+          placeholder="New list name"
+          aria-label="New list name"
+          [(ngModel)]="newListName"
+          (keyup.enter)="createList()"
+          maxlength="40"
+        />
+        <button class="btn-ghost" (click)="createList()" [disabled]="creating()">
+          {{ creating() ? 'Creating…' : '+ New list' }}
+        </button>
+      </div>
+    </div>
+
+    @if (selected(); as list) {
+      <section class="card section-card list-panel">
+        <div class="list-panel-header">
+          @if (renamingId() === list.watchlistId) {
+            <div class="rename-form">
+              <input
+                id="rename-list"
+                type="text"
+                aria-label="Watchlist name"
+                [(ngModel)]="renameValue"
+                (keyup.enter)="commitRename()"
+                (keyup.escape)="cancelRename()"
+                maxlength="40"
+              />
+              <button class="btn-accent btn-sm" (click)="commitRename()" [disabled]="savingRename()">
+                {{ savingRename() ? 'Saving…' : 'Save' }}
+              </button>
+              <button class="btn-ghost btn-sm" (click)="cancelRename()">Cancel</button>
+            </div>
+          } @else {
+            <div class="list-titles">
+              <h2>{{ list.name }}</h2>
+              <span class="pill" [class.pill-warn]="list.instruments.length > 20 && !isFull()" [class.pill-danger]="isFull()">
+                {{ countText() }}
+              </span>
+            </div>
+            <div class="list-actions">
+              <button type="button" class="btn-ghost btn-sm" (click)="beginRename(list)">Rename</button>
+              <button
+                type="button"
+                class="btn-ghost btn-sm btn-danger-ghost"
+                (click)="deleteList(list)"
+                [disabled]="deletingId() === list.watchlistId"
+              >
+                {{ deletingId() === list.watchlistId ? 'Deleting…' : 'Delete list' }}
+              </button>
+            </div>
+          }
+        </div>
+
+        <div class="add-instrument">
+          <div class="form-group">
+            <label for="symbol">Add instrument</label>
+            <div class="input-row">
+              <input
+                id="symbol"
+                type="text"
+                placeholder="Symbol, e.g. AAPL, INFY.NS, BTC/USD"
+                [(ngModel)]="newSymbol"
+                (keyup.enter)="addInstrument()"
+                [disabled]="adding() || isFull()"
+                maxlength="20"
+              />
+              <button
+                class="btn-accent"
+                (click)="addInstrument()"
+                [disabled]="adding() || isFull() || !newSymbol()"
+              >
+                {{ adding() ? 'Adding…' : 'Add' }}
+              </button>
+            </div>
+          </div>
+          <p class="section-note" [class.danger]="isFull()">
+            @if (isFull()) {
+              This watchlist is full ({{ maxInstruments }}/{{ maxInstruments }}). Remove an instrument to add another.
+            } @else {
+              Prices are live quotes in each instrument's own currency.
+              @if (list.instruments.length > 0) {
+                Pick a card to chart it below; drag a card onto another list's tab to move it.
+              }
+            }
+          </p>
+        </div>
+
+        @if (list.instruments.length === 0) {
+          <div class="state-card empty-list">
+            <p class="state-title">This list is empty</p>
+            <p>Add your first instrument above.</p>
+          </div>
+        } @else {
+          <app-watchlist-carousel
+            [items]="list.instruments"
+            [selected]="focused()?.symbol ?? null"
+            [removable]="true"
+            [removingId]="removingId()"
+            [draggingId]="draggingId()"
+            (pick)="focus($event.symbol)"
+            (remove)="removeInstrument($event)"
+            (dragStart)="onDragStart($event.item, $event.event)"
+            (dragEnd)="onDragEnd()" />
+
+          @if (focused(); as f) {
+            <section class="focus-panel" aria-live="polite">
+              <header class="focus-head">
+                <div class="focus-id">
+                  <h3>{{ f.symbol }}</h3>
+                  <span class="focus-sub">{{ f.assetClass }}{{ f.ticker && f.ticker !== f.symbol ? ' · ' + f.ticker : '' }}</span>
+                </div>
+                <div class="focus-price">
+                  @if (f.currentPrice !== null) {
+                    <span class="focus-last">{{ formatPrice(f.currentPrice, f.priceCurrency) }}</span>
+                  }
+                  <span class="focus-change" [ngClass]="getChangeClass(f.change)">{{ formatChange(f.change, f.changePercent) }}</span>
+                </div>
+                <dl class="focus-facts">
+                  <div><dt>Bid</dt><dd class="mono">{{ formatPrice(f.bid, f.priceCurrency) }}</dd></div>
+                  <div><dt>Ask</dt><dd class="mono">{{ formatPrice(f.ask, f.priceCurrency) }}</dd></div>
+                  <div><dt>Added</dt><dd>{{ f.addedAt | date: 'MMM d, y' }}</dd></div>
+                </dl>
+                <div class="focus-actions">
+                  <button type="button" class="btn-accent btn-sm" (click)="go('/order', f.symbol)">Trade</button>
+                  <button type="button" class="btn-ghost btn-sm" (click)="go('/advice', f.symbol)">Advice</button>
+                  <button type="button" class="btn-ghost btn-sm" (click)="go('/automated-trading', f.symbol)">Automate</button>
+                  <button type="button" class="btn-ghost btn-sm" (click)="go('/alerts', f.symbol)">Alert</button>
+                </div>
+              </header>
+              <app-price-chart [symbol]="f.symbol" [height]="380" />
+            </section>
+          }
+        }
+      </section>
+    }
+  }
+
+  @if (confirmRequest(); as req) {
+    <div class="dialog-backdrop" (click)="dismissConfirm()"></div>
+    <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="confirm-title" aria-describedby="confirm-message">
+      <div class="dialog-head">
+        <h2 id="confirm-title" class="dialog-title">{{ req.title }}</h2>
+        <button type="button" class="dialog-close" (click)="dismissConfirm()" aria-label="Cancel">
+          <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+            <line x1="18" y1="6" x2="6" y2="18" /><line x1="6" y1="6" x2="18" y2="18" />
+          </svg>
+        </button>
+      </div>
+      <p id="confirm-message" class="dialog-detail">{{ req.message }}</p>
+      <div class="dialog-actions">
+        <button type="button" class="btn-ghost" (click)="dismissConfirm()">Cancel</button>
+        <button type="button" class="btn-accent btn-danger" (click)="runConfirm()">{{ req.confirmLabel }}</button>
+      </div>
+    </div>
+  }
+</div>

@@ -1,0 +1,94 @@
+<div class="assistant">
+  @if (open()) {
+    <div class="assistant-panel" role="dialog" aria-label="Trading assistant">
+      <header class="assistant-header">
+        <div class="assistant-identity">
+          <span class="orb"><span class="orb-core"></span></span>
+          <div>
+            <div class="assistant-name">Akatsuki Assistant</div>
+            <div class="assistant-status"><span class="live-dot"></span> Online · your trading copilot</div>
+          </div>
+        </div>
+        <div class="header-actions">
+          <button class="head-btn" (click)="openFullPage()" aria-label="Open the full assistant" title="Open full page">
+            <svg viewBox="0 0 24 24"><path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7"/></svg>
+          </button>
+          <button class="head-btn" (click)="close()" aria-label="Close assistant" title="Close">
+            <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="assistant-thread" #thread>
+        @for (msg of messages(); track msg.id) {
+          <div class="msg" [class.msg-bot]="msg.role === 'bot'" [class.msg-user]="msg.role === 'user'">
+            @if (msg.role === 'bot') {
+              <span class="mini-avatar" aria-hidden="true"><span></span></span>
+            }
+            <div class="msg-body">
+              <div class="bubble">{{ msg.text }}</div>
+              @if (msg.actions?.length) {
+                <div class="msg-actions">
+                  @for (action of msg.actions; track action.id + action.label) {
+                    <button class="action-chip" [class.primary]="action.id === 'confirm-order' || action.id === 'submit'"
+                            (click)="runAction(action)">
+                      {{ action.label }}
+                    </button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+        }
+        @if (busy()) {
+          <div class="msg msg-bot">
+            <span class="mini-avatar" aria-hidden="true"><span></span></span>
+            <div class="msg-body">
+              <div class="bubble typing"><span></span><span></span><span></span></div>
+            </div>
+          </div>
+        }
+      </div>
+
+      <div class="assistant-quick">
+        <div class="quick-row">
+          <button class="quick-chip" (click)="runAction({ id: 'menu', label: 'Main menu' })">
+            <svg viewBox="0 0 24 24"><path d="M3 12h18M3 6h18M3 18h18"/></svg>
+            Menu
+          </button>
+          <button class="quick-chip" (click)="runAction({ id: 'positions', label: 'My positions' })">
+            <svg viewBox="0 0 24 24"><path d="M3 3v18h18M7 14l3-4 3 3 4-6"/></svg>
+            Positions
+          </button>
+          <button class="quick-chip" (click)="runAction({ id: 'place-order', label: 'Place an order' })">
+            <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+            Place an order
+          </button>
+        </div>
+        <div class="composer">
+          <input
+            type="text"
+            class="chatbot-input"
+            placeholder="Ask anything, or say “buy 2 AAPL”…"
+            (keydown.enter)="sendChatMessage($event)"
+            #chatInput
+            aria-label="Chat message input"
+          />
+          <button class="send-btn" (click)="sendChatMessage($event)" [disabled]="busy()" aria-label="Send message">
+            <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  }
+
+  <button class="assistant-launcher" [class.active]="open()" (click)="toggle()" aria-label="Toggle trading assistant">
+    @if (open()) {
+      <svg class="launcher-icon" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+    } @else {
+      <span class="launcher-orb" aria-hidden="true"><span></span></span>
+      <span class="launcher-label">Ask AI</span>
+      <span class="launcher-ring" aria-hidden="true"></span>
+    }
+  </button>
+</div>

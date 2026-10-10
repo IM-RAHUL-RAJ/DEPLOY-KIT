@@ -1,0 +1,88 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.preferences.mapper.PreferencesMapper">
+
+    <!-- Unqualified on purpose: the datasource sets currentSchema=trading in Postgres and the
+         H2 test schema has no qualifier, exactly as the other mappers in this service do. -->
+
+    <select id="findByAccountId"
+            resultType="com.trading.tradeapi.preferences.entity.CustomerPreferenceRecord">
+        SELECT account_id         AS accountId,
+               default_account_id AS defaultAccountId,
+               alert_channel      AS alertChannel,
+               alert_contact      AS alertContact,
+               display_currency   AS displayCurrency,
+               theme              AS theme,
+               updated_at         AS updatedAt
+        FROM customer_preference
+        WHERE account_id = #{accountId}
+    </select>
+
+    <insert id="insert">
+        INSERT INTO customer_preference
+            (account_id, default_account_id, alert_channel, alert_contact, display_currency, updated_at)
+        VALUES
+            (#{accountId}, #{defaultAccountId}, #{alertChannel}, #{alertContact}, #{displayCurrency}, now())
+    </insert>
+
+    <update id="update">
+        UPDATE customer_preference
+        SET default_account_id = #{defaultAccountId},
+            alert_channel      = #{alertChannel},
+            alert_contact      = #{alertContact},
+            display_currency   = #{displayCurrency},
+            updated_at         = now()
+        WHERE account_id = #{accountId}
+    </update>
+
+    <!-- The theme alone: a row that does not exist yet is created with no delivery channel. -->
+    <update id="updateTheme">
+        UPDATE customer_preference
+        SET theme = #{theme},
+            updated_at = now()
+        WHERE account_id = #{accountId}
+    </update>
+
+    <insert id="insertTheme">
+        INSERT INTO customer_preference (account_id, alert_channel, theme, updated_at)
+        VALUES (#{accountId}, 'NONE', #{theme}, now())
+    </insert>
+
+    <select id="findNotificationPreference"
+            resultType="com.trading.tradeapi.preferences.entity.NotificationPreferenceRecord">
+        SELECT account_id AS accountId,
+               category   AS category,
+               channel    AS channel,
+               contact    AS contact,
+               updated_at AS updatedAt
+        FROM notification_preference
+        WHERE account_id = #{accountId} AND category = #{category}
+    </select>
+
+    <select id="findNotificationPreferences"
+            resultType="com.trading.tradeapi.preferences.entity.NotificationPreferenceRecord">
+        SELECT account_id AS accountId,
+               category   AS category,
+               channel    AS channel,
+               contact    AS contact,
+               updated_at AS updatedAt
+        FROM notification_preference
+        WHERE account_id = #{accountId}
+    </select>
+
+    <insert id="insertNotificationPreference">
+        INSERT INTO notification_preference (account_id, category, channel, contact, updated_at)
+        VALUES (#{accountId}, #{category}, #{channel}, #{contact}, now())
+    </insert>
+
+    <update id="updateNotificationPreference">
+        UPDATE notification_preference
+        SET channel    = #{channel},
+            contact    = #{contact},
+            updated_at = now()
+        WHERE account_id = #{accountId} AND category = #{category}
+    </update>
+
+</mapper>

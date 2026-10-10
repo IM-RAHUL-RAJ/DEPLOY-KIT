@@ -1,0 +1,592 @@
+.admin-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+
+.admin-toolbar-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.admin-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.admin-stat {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.stat-value {
+  font-size: 28px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-foot {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+.admin-table-wrap {
+  overflow: auto;
+  max-height: calc(100vh - 320px);
+}
+
+.admin-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.admin-input,
+.admin-select {
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: 9px;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 12.5px;
+  padding: 8px 11px;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+
+  &:focus {
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--accent-dim);
+  }
+}
+
+.admin-input {
+  width: 118px;
+}
+
+.admin-select {
+  cursor: pointer;
+}
+
+.admin-btn {
+  border-radius: 9px;
+  padding: 8px 14px;
+  font-size: 12.5px;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid var(--border-color);
+  background: var(--panel-tint);
+  color: var(--text-secondary);
+  transition: all 0.18s;
+  white-space: nowrap;
+
+  &:hover:not(:disabled) {
+    border-color: var(--border-hover);
+    color: var(--accent);
+    background: var(--accent-dim);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.admin-btn.primary {
+  background: var(--gradient-brand);
+  border: none;
+  color: #160407;
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.05);
+    color: #160407;
+  }
+}
+
+.admin-btn.danger:hover:not(:disabled) {
+  color: var(--negative);
+  border-color: rgba(225, 38, 61, 0.45);
+  background: rgba(225, 38, 61, 0.08);
+}
+
+.admin-empty {
+  padding: 44px 20px;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.type-badge,
+.tone-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  border-radius: 7px;
+  padding: 3px 9px;
+  min-width: 96px;
+  border: 1px solid var(--border-color);
+  background: var(--panel-tint);
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.type-badge.admin {
+  color: var(--accent-indigo);
+  border-color: rgba(124, 140, 255, 0.35);
+  background: rgba(124, 140, 255, 0.1);
+}
+
+.tone-badge.positive {
+  color: var(--positive);
+  border-color: rgba(255, 90, 60, 0.34);
+  background: rgba(255, 90, 60, 0.1);
+}
+
+.tone-badge.warning {
+  color: var(--warning);
+  border-color: rgba(245, 181, 68, 0.34);
+  background: rgba(245, 181, 68, 0.1);
+}
+
+.tone-badge.negative {
+  color: var(--negative);
+  border-color: rgba(225, 38, 61, 0.34);
+  background: rgba(225, 38, 61, 0.1);
+}
+
+.admin-loading {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 40px;
+  justify-content: center;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.mono-id {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+
+/* ---- Approval console ---- */
+
+.queue-tabs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.queue-tab {
+  display: grid;
+  gap: 2px;
+  text-align: left;
+  padding: 12px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border);
+  background: var(--bg-panel);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, transform 0.15s;
+}
+
+.queue-tab:hover {
+  border-color: var(--border-strong);
+  transform: translateY(-1px);
+}
+
+.queue-tab.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+.queue-label {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.queue-count {
+  font-family: var(--font-mono);
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-primary);
+  line-height: 1.1;
+}
+
+.queue-tab.active .queue-count {
+  color: var(--accent);
+}
+
+.queue-hint {
+  font-size: 10.5px;
+  color: var(--text-muted);
+}
+
+/* The table takes the full width until an applicant is selected; only then is
+   a column made for the detail panel. */
+.console {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+.console.with-detail {
+  grid-template-columns: minmax(0, 1.6fr) minmax(300px, 1fr);
+}
+
+@media (max-width: 1100px) {
+  .console.with-detail {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* Scroll sideways rather than clip: the last column holds the Approve and
+   Reject actions, and clipping it hides them. */
+.queue-panel {
+  padding: 0;
+  overflow-x: auto;
+}
+
+.queue-panel .admin-actions {
+  white-space: nowrap;
+}
+
+.queue-row {
+  cursor: pointer;
+}
+
+.queue-row:hover {
+  background: var(--bg-panel-alt);
+}
+
+.queue-row.selected td {
+  background: var(--accent-soft);
+}
+
+.queue-row.selected td:first-child {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 48px 20px;
+}
+
+.empty-mark {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--positive);
+  background: var(--positive-soft);
+  color: var(--positive);
+  margin-bottom: 4px;
+}
+
+.empty-mark svg {
+  width: 22px;
+  height: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2;
+}
+
+.empty-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.detail-panel {
+  display: grid;
+  gap: 14px;
+}
+
+.detail-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+}
+
+.detail-head>.tone-badge {
+  margin-left: auto;
+}
+
+.detail-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.avatar-lg {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  height: 42px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.detail-grid {
+  display: grid;
+  grid-template-columns: 116px minmax(0, 1fr);
+  gap: 7px 12px;
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.detail-grid dt {
+  color: var(--text-muted);
+}
+
+.detail-grid dd {
+  margin: 0;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.neg-text {
+  color: var(--negative);
+}
+
+.action-box {
+  display: grid;
+  gap: 8px;
+  padding: 13px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--accent);
+  background: var(--accent-soft);
+}
+
+.action-box.danger-box {
+  border-color: var(--negative);
+  background: rgba(225, 38, 61, 0.08);
+}
+
+.action-box p {
+  margin: 0;
+  font-size: 12px;
+}
+
+.action-title {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.field-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.field-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.admin-input.wide {
+  width: 100%;
+}
+
+/* Overview visualisations. The donut geometry matches the analysis page. */
+.admin-viz {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.viz-card {
+  padding: 0 0 8px;
+}
+
+.viz-card .admin-toolbar {
+  padding: 18px 20px 4px;
+}
+
+.viz-body {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  padding: 10px 20px 18px;
+  flex-wrap: wrap;
+}
+
+.donut-wrap {
+  position: relative;
+  width: 168px;
+  height: 168px;
+  flex: 0 0 auto;
+}
+
+.donut {
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+
+.donut-track,
+.donut-slice {
+  fill: none;
+  stroke-width: 4.2;
+}
+
+.donut-slice {
+  stroke-linecap: butt;
+}
+
+.donut-hole {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  pointer-events: none;
+}
+
+.donut-total {
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.donut-caption {
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--text-muted);
+}
+
+.viz-legend {
+  flex: 1 1 200px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  min-width: 190px;
+}
+
+.viz-legend li {
+  display: grid;
+  grid-template-columns: 12px 1fr auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+.swatch {
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+  display: inline-block;
+}
+
+.legend-symbol {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.legend-value {
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.legend-pct {
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  min-width: 50px;
+  text-align: right;
+}
+
+.viz-empty {
+  padding: 34px 20px 40px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.exec-bar {
+  height: 12px;
+  margin: 14px 20px 18px;
+  background: var(--bg-panel-alt);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.exec-filled {
+  height: 100%;
+  background: var(--positive);
+}
+
+.exec-rows {
+  padding: 0 20px 12px;
+}
+
+.exec-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-size: 12.5px;
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+/* With the detail panel beside the table, Country and Risk show there, so the
+   table drops them and keeps the Actions column in view. */
+@media (min-width: 1101px) {
+  .console.with-detail .queue-panel :is(th, td):is(:nth-child(2), :nth-child(3)) {
+    display: none;
+  }
+}

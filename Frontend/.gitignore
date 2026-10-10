@@ -1,0 +1,33 @@
+# Local build and tooling output
+node_modules/
+dist/
+.angular/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+coverage/
+playwright-report/
+test-results/
+blob-report/
+.playwright/
+
+# Environment and secrets
+.env
+.env.local
+*.local.env
+
+# IDEs and editors
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# The generated API clients under generated/ are COMMITTED ON PURPOSE.
+# They are regenerated on every contract change (npm run generate) and must
+# never be git-ignored, so that a clone builds with no Java runtime and no
+# network, and a contract change arrives as a reviewable diff.
+# Do NOT add generated/ here.

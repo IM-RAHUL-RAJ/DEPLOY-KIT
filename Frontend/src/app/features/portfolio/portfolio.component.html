@@ -1,0 +1,235 @@
+<div class="ext-page portfolio-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Portfolio</h1>
+      <p class="page-subtitle">Holdings priced live, with cost basis and realised and unrealised profit and loss</p>
+    </div>
+    @if (summary(); as summary) {
+      <span class="asof-line">
+        Priced {{ summary.asOf | date: 'MMM d, y, HH:mm' }}
+        @if (summary.positionCount === 0) {
+          · no open positions
+        }
+      </span>
+    }
+  </div>
+
+  @if (loading()) {
+    <div class="card state-card inline">
+      <span class="spinner"></span>
+      <span>Pricing your portfolio…</span>
+    </div>
+  } @else {
+    @if (errorMessage()) {
+      <div class="error-banner" role="alert">
+        <span class="icon">!</span>
+        <span>{{ errorMessage() }}</span>
+      </div>
+    }
+
+    @if (summary(); as summary) {
+      @if (summary.partial) {
+        <div class="warning-banner" role="status">
+          <span class="icon">⚠</span>
+          <span>
+            Some holdings could not be priced and are shown without a market value.
+            Stale or missing quotes are marked below.
+          </span>
+        </div>
+      }
+
+      <div class="stat-grid">
+        <div class="stat-card card">
+          <span class="stat-label">Total value</span>
+          <span class="stat-value">{{ fmtBase(summary.totalValue) }}</span>
+          <span class="stat-sub">cash + market value</span>
+        </div>
+        <div class="stat-card card">
+          <span class="stat-label">Cash balance</span>
+          <span class="stat-value">{{ fmtBase(summary.cashBalance) }}</span>
+          <span class="stat-sub">in {{ summary.baseCurrency }}</span>
+        </div>
+        <div class="stat-card card">
+          <span class="stat-label">Market value</span>
+          <span class="stat-value">{{ fmtBase(summary.marketValue) }}</span>
+          <span class="stat-sub">{{ summary.positionCount }} position(s)</span>
+        </div>
+        <div class="stat-card card">
+          <span class="stat-label">Cost basis</span>
+          <span class="stat-value">{{ fmtBase(summary.costBasis) }}</span>
+          <span class="stat-sub">weighted average cost × quantity</span>
+        </div>
+        <div class="stat-card card">
+          <span class="stat-label">Unrealised P&L</span>
+          <span class="stat-value" [ngClass]="pnlClass(summary.unrealisedPnl)">
+            {{ fmtBase(summary.unrealisedPnl) }}
+          </span>
+          <span class="stat-sub" [ngClass]="pnlClass(summary.unrealisedPnl)">
+            @if (summary.unrealisedPnlPercent !== null) {
+              {{ summary.unrealisedPnlPercent.toFixed(2) }}% on cost
+            } @else {
+              —
+            }
+          </span>
+        </div>
+        <div class="stat-card card">
+          <span class="stat-label">Realised P&L</span>
+          <span class="stat-value" [ngClass]="pnlClass(summary.realisedPnl)">
+            {{ fmtBase(summary.realisedPnl) }}
+          </span>
+          <span class="stat-sub">booked at sale, never from today's price</span>
+        </div>
+      </div>
+
+    }
+
+    @if (pnl(); as pnl) {
+      <section class="card section-card pnl-card">
+        <div class="section-head">
+          <div>
+            <h2>Profit &amp; loss</h2>
+            <p>Realised P&amp;L is booked when a holding is sold; unrealised P&amp;L moves with the market.</p>
+          </div>
+          @if (pnl.from || pnl.to) {
+            <span class="pill">realised {{ pnl.from ?? '…' }} → {{ pnl.to ?? '…' }}</span>
+          }
+        </div>
+        <div class="pnl-totals">
+          <div class="pnl-total">
+            <span class="stat-label">Realised</span>
+            <span class="stat-value sm" [ngClass]="pnlClass(pnl.realisedPnl)">
+              {{ fmtBase(pnl.realisedPnl) }}
+            </span>
+          </div>
+          <div class="pnl-total">
+            <span class="stat-label">Unrealised</span>
+            <span class="stat-value sm" [ngClass]="pnlClass(pnl.unrealisedPnl)">
+              {{ fmtBase(pnl.unrealisedPnl) }}
+            </span>
+          </div>
+          <div class="pnl-total">
+            <span class="stat-label">Total</span>
+            <span class="stat-value sm" [ngClass]="pnlClass(pnl.totalPnl)">
+              {{ fmtBase(pnl.totalPnl) }}
+            </span>
+          </div>
+        </div>
+        @if (bySymbol().length > 0) {
+          <div class="table-scroll">
+          <table class="data-table pnl-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th class="right">Realised</th>
+                <th class="right">Unrealised</th>
+                <th class="right">Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (row of bySymbol(); track row.symbol) {
+                <tr>
+                  <td class="symbol-cell"><span [appChartSymbol]="row.symbol">{{ row.symbol }}</span></td>
+                  <td class="right" [ngClass]="pnlClass(row.realisedPnl)">{{ fmtBase(row.realisedPnl) }}</td>
+                  <td class="right" [ngClass]="pnlClass(row.unrealisedPnl)">{{ fmtBase(row.unrealisedPnl) }}</td>
+                  <td class="right" [ngClass]="pnlClass(row.totalPnl)">{{ fmtBase(row.totalPnl) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+          </div>
+        }
+      </section>
+    }
+
+    @if (!degraded() && positions().length > 0) {
+      <div class="card table-card">
+        <div class="table-summary">
+          <span><strong>{{ positions().length }}</strong> holdings</span>
+          <span><strong>{{ pricedCount() }}</strong> priced</span>
+          <span>amounts in {{ currency.selected() }}</span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table positions-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th class="right">Qty</th>
+                <th class="right">Avg cost</th>
+                <th class="right">Last</th>
+                <th class="right">Market value</th>
+                <th class="right">Unrealised P&L</th>
+                <th class="right">%</th>
+                <th>Price observed</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (position of positions(); track position.symbol) {
+                <tr [class.stale-row]="position.stale">
+                  <td class="symbol-cell"><span [appChartSymbol]="position.symbol">{{ position.symbol }}</span>
+                    @if (position.stale) {
+                      <span class="pill pill-warn stale-badge">stale</span>
+                    }
+                  </td>
+                  <td class="right">{{ position.quantity }}</td>
+                  <td class="right">{{ fmtBase(position.averageCost) }}</td>
+                  <td class="right">{{ fmtBase(position.lastPrice) }}</td>
+                  <td class="right">{{ fmtBase(position.marketValue) }}</td>
+                  <td class="right" [ngClass]="position.unrealisedPnl === null ? '' : pnlClass(position.unrealisedPnl)">
+                    @if (position.unrealisedPnl === null) {
+                      —
+                    } @else {
+                      {{ fmtBase(position.unrealisedPnl) }}
+                    }
+                  </td>
+                  <td class="right">
+                    @if (position.unrealisedPnlPercent === null) {
+                      —
+                    } @else {
+                      {{ position.unrealisedPnlPercent.toFixed(2) }}%
+                    }
+                  </td>
+                  <td>
+                    @if (position.priceAsOf) {
+                      <span class="text-secondary nowrap">{{ position.priceAsOf | date: 'MMM d, HH:mm' }}</span>
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+
+    @if (degraded()) {
+      <div class="card table-card">
+        <div class="table-summary">
+          <span><strong>{{ degradedPositions().length }}</strong> holdings</span>
+          <span>unpriced · amounts in {{ currency.selected() }}</span>
+        </div>
+        <div class="table-scroll">
+          <table class="data-table positions-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th class="right">Qty</th>
+                <th class="right">Average cost</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (holding of degradedPositions(); track holding.symbol) {
+                <tr>
+                  <td class="symbol-cell"><span [appChartSymbol]="holding.symbol">{{ holding.symbol }}</span></td>
+                  <td class="right">{{ holding.quantity }}</td>
+                  <td class="right">{{ fmtBase(holding.averageCost) }}</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </div>
+    }
+  }
+</div>

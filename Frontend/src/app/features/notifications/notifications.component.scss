@@ -1,0 +1,93 @@
+.page-header .btn-ghost.active {
+  border-color: var(--accent);
+  color: var(--text-primary);
+  background: var(--accent-soft);
+}
+
+.notifications-table td {
+  vertical-align: top;
+}
+
+.notification-row.unread {
+  background: var(--panel-tint);
+  box-shadow: inset 3px 0 0 var(--accent);
+
+  .notification-title {
+    font-weight: 700;
+  }
+}
+
+.message-cell {
+  min-width: 280px;
+}
+
+.notification-title {
+  display: block;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.notification-body {
+  display: block;
+  margin-top: 4px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+// Group tabs (their side) sit on the summary row, styled with the theme tokens.
+.inbox-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--border-color);
+
+  .table-summary {
+    padding: 14px 0;
+    border-bottom: none;
+  }
+}
+
+.filter-tabs {
+  display: flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+
+.filter-tab {
+  margin-bottom: -1px;
+  padding: 14px 12px 12px;
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: color 0.2s, border-color 0.2s;
+
+  &:hover {
+    color: var(--text-primary);
+  }
+
+  &.active {
+    color: var(--accent);
+    border-bottom-color: var(--accent);
+  }
+}
+
+.filtered-empty {
+  padding: 40px 24px;
+}

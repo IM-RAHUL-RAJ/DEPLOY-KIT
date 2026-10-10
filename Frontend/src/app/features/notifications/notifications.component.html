@@ -1,0 +1,108 @@
+<div class="ext-page notifications-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Inbox</h1>
+      <p class="page-subtitle">All your account, order, and price notifications</p>
+    </div>
+    <button class="btn-ghost" [class.active]="unreadOnly()" (click)="toggleUnreadOnly()" [attr.aria-pressed]="unreadOnly()">
+      {{ unreadOnly() ? 'Showing unread' : `Unread only (${unreadCount()})` }}
+    </button>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert">
+      <span class="icon">!</span>
+      <span>{{ errorMessage() }}</span>
+    </div>
+  }
+
+  @if (loading()) {
+    <div class="card state-card inline">
+      <span class="spinner"></span>
+      <span>Loading your notifications…</span>
+    </div>
+  } @else if (loadFailed()) {
+    <!-- The error banner above says what went wrong; there is nothing to list. -->
+  } @else if (inbox().length === 0) {
+    <div class="card state-card">
+      <svg viewBox="0 0 24 24">
+        <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" />
+        <path d="M13.7 21a2 2 0 0 1-3.4 0" />
+      </svg>
+      <p class="state-title">No notifications yet</p>
+      <p>Account changes, order updates, and price alerts appear here.</p>
+    </div>
+  } @else {
+    <div class="card table-card">
+      <div class="inbox-controls">
+        <div class="filter-tabs" role="tablist" aria-label="Notification group">
+          @for (group of groups; track group.value) {
+            <button
+              type="button"
+              role="tab"
+              class="filter-tab"
+              [class.active]="selectedGroup() === group.value"
+              [attr.aria-selected]="selectedGroup() === group.value"
+              (click)="selectGroup(group.value)"
+            >
+              {{ group.label }}
+            </button>
+          }
+        </div>
+        <div class="table-summary">
+          <button class="btn-ghost btn-sm" (click)="markAllRead()" [disabled]="markingAll() || unreadCount() === 0">
+            {{ markingAll() ? 'Marking…' : 'Mark all as read' }}
+          </button>
+          <span><strong>{{ inbox().length }}</strong> total</span>
+          <span><strong>{{ unreadCount() }}</strong> unread</span>
+        </div>
+      </div>
+      @if (isEmpty()) {
+        <!-- Filters are still on screen above, so the customer can widen them again. -->
+        <div class="state-card filtered-empty">
+          <p class="state-title">{{ unreadOnly() ? 'Nothing unread here' : 'Nothing in this group' }}</p>
+          <p>Choose another group{{ unreadOnly() ? ', or show read messages too' : '' }}.</p>
+        </div>
+      } @else {
+      <div class="table-scroll">
+        <table class="data-table notifications-table">
+          <thead>
+            <tr>
+              <th>When</th>
+              <th>Message</th>
+              <th>Category</th>
+              <th>Channel</th>
+              <th>Status</th>
+              <th><span class="sr-only">Actions</span></th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of notifications(); track item.notificationId) {
+              <tr class="notification-row" [class.unread]="!item.read">
+                <td class="nowrap text-secondary">{{ item.createdAt | date: 'MMM d, HH:mm' }}</td>
+                <td class="message-cell">
+                  <span class="notification-title">{{ item.title }}</span>
+                  <span class="notification-body">{{ item.body }}</span>
+                </td>
+                <td><span class="pill">{{ categoryLabel(item.category) }}</span></td>
+                <td class="text-secondary">{{ item.channel }}</td>
+                <td>
+                  <span class="pill" [class.pill-live]="item.status === 'SENT'"
+                        [class.pill-danger]="item.status === 'FAILED'">
+                    {{ statusLabel(item.status) }}
+                  </span>
+                </td>
+                <td class="cell-actions">
+                  @if (!item.read) {
+                    <button class="btn-ghost btn-sm" (click)="markRead(item)">Mark read</button>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+      }
+    </div>
+  }
+</div>

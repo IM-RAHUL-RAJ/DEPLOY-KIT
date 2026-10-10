@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.marketdata.MarketDataMapper">
+
+    <sql id="quoteColumns">
+        symbol,
+        price,
+        bid,
+        ask,
+        TRIM(currency)  AS currency,
+        change,
+        change_percent  AS changePercent,
+        market_state    AS marketState,
+        stale,
+        quote_as_of     AS quoteAsOf,
+        fetched_at      AS fetchedAt
+    </sql>
+
+    <select id="findQuote" resultType="com.trading.tradeapi.marketdata.MarketQuote">
+        SELECT <include refid="quoteColumns"/>
+        FROM market_quote
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findQuotes" resultType="com.trading.tradeapi.marketdata.MarketQuote">
+        SELECT <include refid="quoteColumns"/>
+        FROM market_quote
+        WHERE symbol IN
+        <foreach collection="symbols" item="s" open="(" separator="," close=")">#{s}</foreach>
+    </select>
+
+    <select id="findCandles" resultType="com.trading.tradeapi.marketdata.MarketCandles">
+        SELECT symbol,
+               TRIM(currency) AS currency,
+               candles,
+               fetched_on     AS fetchedOn,
+               fetched_at     AS fetchedAt
+        FROM market_candles
+        WHERE symbol = #{symbol}
+    </select>
+
+    <update id="extendInterest">
+        UPDATE market_interest
+        SET expires_at = GREATEST(expires_at, CURRENT_TIMESTAMP + (CAST(#{ttlMinutes} AS INTEGER) * INTERVAL '1' MINUTE)),
+            requested_at = CASE WHEN expires_at &lt; CURRENT_TIMESTAMP THEN CURRENT_TIMESTAMP ELSE requested_at END
+        WHERE symbol = #{symbol} AND reason = #{reason}
+    </update>
+
+    <insert id="insertInterest">
+        INSERT INTO market_interest (symbol, reason, requested_at, expires_at)
+        VALUES (#{symbol}, #{reason}, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP + (CAST(#{ttlMinutes} AS INTEGER) * INTERVAL '1' MINUTE))
+    </insert>
+
+    <select id="isNotFound" resultType="boolean">
+        SELECT EXISTS (
+            SELECT 1 FROM market_interest
+            WHERE symbol = #{symbol} AND reason = #{reason}
+              AND not_found_at IS NOT NULL
+              AND not_found_at &gt; CURRENT_TIMESTAMP - (CAST(#{withinMinutes} AS INTEGER) * INTERVAL '1' MINUTE))
+    </select>
+</mapper>

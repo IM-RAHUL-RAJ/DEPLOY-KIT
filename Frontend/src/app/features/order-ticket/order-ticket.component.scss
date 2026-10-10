@@ -1,0 +1,308 @@
+.ticket-page {
+  padding: 28px 32px 48px;
+  max-width: 1240px;
+  margin: 0 auto;
+}
+
+.page-header { margin-bottom: 24px; }
+.page-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.page-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+.ticket-layout {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 22px;
+  align-items: start;
+
+  @media (max-width: 1024px) { grid-template-columns: 1fr; }
+}
+
+.ticket-card {
+  padding: 32px;
+  position: relative;
+
+  .card-radial-glow {
+    position: absolute;
+    top: -40px;
+    right: -40px;
+    width: 220px;
+    height: 220px;
+    background: var(--accent);
+    filter: blur(90px);
+    opacity: 0.1;
+    pointer-events: none;
+    border-radius: 50%;
+  }
+}
+
+form {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+
+  @media (max-width: 560px) { grid-template-columns: 1fr; }
+}
+
+.field-hint { font-size: 11px; color: var(--text-muted); display: block; margin-top: 6px; }
+
+.segmented.order-type {
+  button.active {
+    background: var(--accent-dim);
+    color: var(--accent);
+    box-shadow: inset 0 0 0 1px var(--border-hover);
+  }
+}
+
+
+.submit-btn { padding: 15px; font-size: 15px; margin-top: 4px; }
+
+/* Success panel */
+.success-panel {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  text-align: center;
+
+  .success-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 50%;
+    background: var(--accent-dim);
+    border: 2px solid var(--accent);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--accent);
+    box-shadow: var(--accent-glow);
+
+    svg { width: 28px; height: 28px; stroke: var(--accent); fill: none; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
+  }
+
+  h2 { font-size: 22px; font-weight: 700; }
+}
+
+.order-summary {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 20px;
+  background: var(--surface-tint-weak);
+}
+
+.summary-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 14px;
+  .label { color: var(--text-secondary); }
+}
+
+.pending-note {
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  background: rgba(245, 181, 68, 0.08);
+  border: 1px solid rgba(245, 181, 68, 0.25);
+  border-radius: var(--radius-sm);
+  padding: 14px 18px;
+  a { color: var(--accent); font-weight: 600; }
+}
+
+/* Catalogue panel */
+.catalogue-card { padding: 24px; }
+.catalogue-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-bottom: 18px;
+}
+.catalogue-list { display: flex; flex-direction: column; gap: 14px; }
+.catalogue-item {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid var(--divider);
+  &:last-child { border-bottom: none; padding-bottom: 0; }
+
+  .code {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--accent);
+    background: var(--accent-dim);
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    padding: 2px 8px;
+    width: fit-content;
+  }
+  .desc { font-size: 12px; color: var(--text-secondary); line-height: 1.4; }
+}
+
+/* Market order: the price is the service's decision, so it is shown, not entered. */
+.market-price-panel {
+  .server-priced {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-height: 46px;
+    padding: 11px 15px;
+    border: 1px dashed var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg-input);
+  }
+}
+
+.server-priced-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--accent);
+  background: var(--accent-soft);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+
+.indicative {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-primary);
+  display: inline-flex;
+  gap: 8px;
+  align-items: baseline;
+}
+
+.stale-flag {
+  font-size: 10.5px;
+  font-weight: 700;
+  color: var(--warning);
+  border: 1px solid var(--warning);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+
+/* Two actions side by side after a successful submission. */
+.success-actions {
+  display: flex;
+  gap: 10px;
+  margin-top: 6px;
+  flex-wrap: wrap;
+  justify-content: center;
+}
+
+/* The countdown sits between the explanation and the buttons: it is a promise,
+   not a warning, so it is quieter than the error banner and warmer than chrome. */
+.redirect-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  font-size: 13px;
+  color: var(--text-secondary);
+  border-top: 1px solid var(--border-color);
+  padding-top: 14px;
+  margin-top: 4px;
+}
+
+.redirect-text {
+  font-variant-numeric: tabular-nums;
+}
+
+.btn-small {
+  padding: 4px 10px;
+  font-size: 12px;
+}
+
+/* The submit button stays live so pressing it explains what is missing; this
+   mutes it as a hint that the form is not yet complete. */
+.submit-btn.btn-muted {
+  opacity: 0.55;
+}
+
+/* ── Live order summary ─────────────────────────────────────────────────── */
+.trade-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-strong);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--panel-tint);
+}
+
+.ts-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ts-title {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ts-pill {
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--border-strong);
+  color: var(--text-secondary);
+  &.buy { color: var(--positive); border-color: var(--positive); }
+  &.sell { color: var(--negative); border-color: var(--negative); }
+}
+
+.ts-rows {
+  display: flex;
+  flex-direction: column;
+  margin: 0;
+}
+
+.ts-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--divider);
+  font-size: 13px;
+
+  dt { color: var(--text-secondary); }
+  dd { margin: 0; color: var(--text-primary); text-align: right; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 6px; }
+}
+
+.ts-total {
+  border-bottom: 0;
+  padding: 10px 0 8px;
+  dt { color: var(--text-primary); font-weight: 700; }
+  dd { font-size: 18px; font-weight: 800; color: var(--accent-yellow); flex-direction: column; align-items: flex-end; gap: 1px; }
+}
+
+.ts-sub { font-size: 11.5px; font-weight: 600; color: var(--text-muted); }
+.ts-arrow { color: var(--text-muted); }
+
+
+.ts-foot { margin: 0; font-size: 11.5px; color: var(--text-muted); line-height: 1.45; }

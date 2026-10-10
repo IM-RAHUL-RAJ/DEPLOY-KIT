@@ -1,0 +1,91 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.notifications.mapper.NotificationMapper">
+
+    <!-- Unqualified on purpose: the datasource sets currentSchema=trading in Postgres and the
+         H2 test schema has no qualifier, exactly as the other mappers in this service do. -->
+
+    <sql id="notification_columns">
+        notification_id AS notificationId,
+        account_id      AS accountId,
+        event_id        AS eventId,
+        category,
+        symbol,
+        title,
+        body,
+        channel,
+        status,
+        read_at         AS readAt,
+        created_at      AS createdAt
+    </sql>
+
+    <select id="findById" resultType="com.trading.tradeapi.notifications.entity.NotificationRecord">
+        SELECT <include refid="notification_columns"/>
+        FROM notification
+        WHERE notification_id = #{notificationId}
+    </select>
+
+    <select id="findUnnotifiedOutcomes" resultType="java.util.HashMap">
+        SELECT o.order_id         AS "orderId",
+               o.account_id       AS "accountId",
+               o.ticker           AS "symbol",
+               o.side             AS "side",
+               o.quantity         AS "quantity",
+               o.price            AS "price",
+               o.executed_price   AS "executedPrice",
+               o.status           AS "status",
+               o.rejection_reason AS "reason"
+        FROM orders o
+        WHERE o.status IN ('FILLED', 'REJECTED', 'CANCELLED')
+          AND (o.executed_on &gt;= #{since} OR o.received_at &gt;= #{since})
+          AND NOT EXISTS (
+                SELECT 1 FROM notification n
+                WHERE n.event_id = 'order-' || o.order_id || '-ORDER_' || o.status
+                   OR (n.account_id = o.account_id
+                       AND n.category = 'ORDER_' || o.status
+                       AND n.body LIKE 'Order ' || o.order_id || ' %'))
+        ORDER BY o.order_id
+        LIMIT #{limit}
+    </select>
+
+    <select id="findByEventId" resultType="com.trading.tradeapi.notifications.entity.NotificationRecord">
+        SELECT <include refid="notification_columns"/>
+        FROM notification
+        WHERE event_id = #{eventId}
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="notificationId" keyColumn="notification_id">
+        INSERT INTO notification
+            (account_id, event_id, category, symbol, title, body, channel, status)
+        VALUES
+            (#{accountId}, #{eventId}, #{category}, #{symbol}, #{title}, #{body}, #{channel}, #{status})
+    </insert>
+
+    <update id="updateStatus">
+        UPDATE notification
+        SET status = #{status}
+        WHERE notification_id = #{notificationId}
+    </update>
+
+    <update id="markRead">
+        UPDATE notification
+        SET read_at = now()
+        WHERE notification_id = #{notificationId}
+          AND account_id = #{accountId}
+    </update>
+
+    <select id="findByAccount" resultType="com.trading.tradeapi.notifications.entity.NotificationRecord">
+        SELECT <include refid="notification_columns"/>
+        FROM notification
+        WHERE account_id = #{accountId}
+          AND channel IN ('PUSH', 'BOTH')
+        <if test="unreadOnly">
+            AND read_at IS NULL
+        </if>
+        ORDER BY created_at DESC, notification_id DESC
+        LIMIT #{limit}
+    </select>
+
+</mapper>

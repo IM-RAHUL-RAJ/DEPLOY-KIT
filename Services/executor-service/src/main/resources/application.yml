@@ -1,0 +1,79 @@
+# Executor service (Trade Executor and the market-data poller).
+#
+# Every host, port and URL comes from an environment variable (Application/.env) or,
+# when that is not set, from the shared Application/Config/application.yml. Nothing
+# environment-specific is written here: change Config or .env, never this file.
+
+server:
+  port: ${EXECUTOR_SERVICE_PORT:${services.executor.port}}
+
+spring:
+  application:
+    name: trade-executor
+  # Load the shared Config/application.yml and Application/.env whichever directory the
+  # service is started from. A later import wins, so .env overrides Config, and real
+  # environment variables override both. All are optional: a container that passes
+  # everything as environment variables needs neither file.
+  config:
+    import:
+      - optional:file:${SHARED_CONFIG:../../Config/application.yml}
+      - optional:file:../Config/application.yml
+      - optional:file:Config/application.yml
+      - optional:file:.env[.properties]
+      - optional:file:../.env[.properties]
+      - optional:file:../../.env[.properties]
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:${database.host}}:${DB_PORT:${database.port}}/${DB_NAME:${database.name}}?currentSchema=${PG_SCHEMA:${database.schema}}
+    username: ${DB_USER:${database.user}}
+    password: ${DB_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+  kafka:
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS:${kafka.host}:${kafka.port}}
+    consumer:
+      group-id: trade-executor
+      enable-auto-commit: false
+      auto-offset-reset: earliest
+
+# Kafka topic names and how long a publish may wait for an unreachable broker. The
+# poller publishes a QUOTE per symbol and a trade event per fill: with the default
+# (60 s) one unreachable broker would stall the whole poll.
+topics:
+  orders: ${ORDERS_TOPIC:${kafka.topics.orders}}
+  trade-events: ${TRADE_EVENTS_TOPIC:${kafka.topics.trade-events}}
+  market-data: ${MARKET_DATA_TOPIC:${kafka.topics.market-data}}
+producer:
+  max-block-ms: ${KAFKA_MAX_BLOCK_MS:${kafka.max-block-ms}}
+
+fauxnance:
+  # REQUIRED: the service refuses to start when FAUXNANCE_API_KEY is absent.
+  api-key: ${FAUXNANCE_API_KEY}
+  base-url: ${FAUXNANCE_BASE_URL:${market-data.base-url}}
+  poll-interval-seconds: ${POLL_INTERVAL_SECONDS:${market-data.poll-interval-seconds}}
+
+# Reference FX rates: units of the currency per 1 unit of the base (USD).
+# Fauxnance exposes no FX endpoint, so these mirror the frontend CurrencyService
+# reference rates; the UI, fills and ledger therefore agree.
+fx:
+  base: USD
+  rates:
+    USD: 1
+    EUR: 0.92
+    GBP: 0.79
+    INR: 83.3
+    JPY: 156.5
+    AUD: 1.5
+    CAD: 1.36
+    SGD: 1.34
+    HKD: 7.82
+    CNY: 7.24
+    KRW: 1345.0
+    AED: 3.67
+    ZAR: 18.4
+    CHF: 0.89
+    SEK: 10.5
+    NOK: 10.7
+    DKK: 6.87
+    BRL: 5.05
+    MXN: 16.8
+    ILS: 3.72
+    TRY: 32.5

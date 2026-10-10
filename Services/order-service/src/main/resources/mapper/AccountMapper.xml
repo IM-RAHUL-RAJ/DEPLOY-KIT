@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.mapper.AccountMapper">
+
+    <select id="findById" resultType="com.trading.tradeapi.entity.AccountRecord">
+        SELECT a.account_id AS accountId,
+               a.user_id AS userId,
+               CONCAT(u.first_name, ' ', u.last_name) AS holderName,
+               a.currency AS currency,
+               a.cash_balance AS cashBalance,
+               a.status AS status,
+               a.version AS version,
+               a.closed_at AS closedAt
+        FROM account a
+        JOIN auth.users u ON a.user_id = u.user_id
+        WHERE a.account_id = #{id}
+    </select>
+
+    <update id="updateCashBalanceAndVersion">
+        UPDATE account
+        SET cash_balance = #{cashBalance},
+            version = version + 1
+        WHERE account_id = #{id}
+          AND version = #{version}
+    </update>
+
+</mapper>

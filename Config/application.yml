@@ -1,0 +1,106 @@
+# =============================================================================
+# Configuration – application.yml
+#
+# The ETP platform's shared, environment-specific configuration: every host, port,
+# URL and non-secret parameter the services need, in one file. All services read
+# it at start-up:
+#
+#   order-service, executor-service   spring.config.import (their application.yml)
+#   auth-service                      src/config/shared-config.ts
+#   ETL Layer                         analytics_pipeline.py (shared-config reader)
+#   Frontend                          scripts/sync-config.mjs writes the browser's
+#                                     src/environments/*.ts from this file before
+#                                     every start, build and test
+#
+# Precedence, highest first:
+#   1. real environment variables        (DB_HOST, KAFKA_BOOTSTRAP_SERVERS, ...)
+#   2. Application/.env                  (secrets and per-machine overrides)
+#   3. this file                         (the shared, environment-specific values)
+#
+# Secrets (DB_PASSWORD, JWT_SECRET, FAUXNANCE_API_KEY, GROQ_API_KEY, SMTP_PASS)
+# never go in this file: it is committed. They live in .env.
+# To deploy somewhere else, copy this file (e.g. application.staging.yml), change
+# the hosts, and point SHARED_CONFIG at the copy.
+# =============================================================================
+
+frontend:
+  url: http://localhost
+  port: 4200
+
+services:
+  auth:
+    url: http://localhost
+    port: 3000
+  order:
+    url: http://localhost
+    port: 8081
+  executor:
+    url: http://localhost
+    port: 8082
+
+database:
+  host: localhost
+  port: 5432
+  name: trading_system_db
+  user: postgres
+  schema: trading
+
+kafka:
+  # The broker as the containers see it on the compose network. A service run on
+  # the host instead reaches the bundled broker on localhost:9092 (set
+  # KAFKA_BOOTSTRAP_SERVERS=localhost:9092 in .env).
+  host: kafka
+  port: 29092
+  topics:
+    orders: orders
+    trade-events: trade-events
+    market-data: market-data
+  # How long a publish may wait for the broker before giving up; a broker outage
+  # must never hold an HTTP request (an order placement) for longer than this.
+  max-block-ms: 3000
+
+# -----------------------------------------------------------------------------
+# External APIs (the URLs; their keys are in .env)
+# -----------------------------------------------------------------------------
+market-data:
+  # Fauxnance market data. Only the executor's poller calls it.
+  base-url: https://y4t9nq2bqf.execute-api.eu-west-2.amazonaws.com/v1
+  poll-interval-seconds: 60
+
+llm:
+  # Groq, OpenAI-compatible chat completions, for the trading assistant.
+  base-url: https://api.groq.com/openai/v1
+  model: openai/gpt-oss-120b
+  timeout-seconds: 10
+
+email:
+  smtp-host: smtp.gmail.com
+  smtp-port: 587
+
+# -----------------------------------------------------------------------------
+# Platform parameters
+# -----------------------------------------------------------------------------
+auth:
+  jwt-issuer: auth-service
+  jwt-ttl-seconds: 900
+  refresh-ttl-seconds: 604800
+
+notifications:
+  # How often settled orders whose Kafka trade event never arrived are notified anyway.
+  sweep-interval-ms: 20000
+
+strategy:
+  # How often active price targets are checked against the latest stored quote.
+  sweep-interval-ms: 15000
+  # How long an automated order may take to be accepted by the order API.
+  order-timeout-ms: 30000
+
+etl:
+  refresh-interval-seconds: 45
+  duckdb-path: ../Databases/DuckDB/analytics/analytics.duckdb
+
+# Notes
+#  • All services share this common application.yml for environment-specific
+#    configuration (hosts, ports, URLs). Credentials are in .env.
+#  • Changing a port or host here also changes the browser's API addresses: the
+#    Frontend regenerates them from this file on every start/build.

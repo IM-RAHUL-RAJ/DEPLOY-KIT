@@ -1,0 +1,190 @@
+<div class="auth">
+  <div class="aurora" aria-hidden="true"><span class="a1"></span><span class="a2"></span><span class="a3"></span><span class="a4"></span></div>
+  <app-auth-showcase variant="login" />
+
+  <main class="auth-panel">
+    <div class="auth-card">
+      <div class="auth-mobile-brand">
+        <app-cloud-mark [size]="40" [glow]="true" />
+        <span>Akatsuki</span>
+      </div>
+
+      @if (mode() === 'forgot') {
+        <header class="auth-head">
+          <h2>Reset your password</h2>
+          <p>Enter the email on your account and we will send a six-digit code.</p>
+        </header>
+        @if (resetError()) {
+          <div class="error-banner" role="alert"><span class="icon">!</span><span>{{ resetError() }}</span></div>
+        }
+        <form class="auth-surface" [formGroup]="forgotForm" (ngSubmit)="requestCode()" novalidate>
+          <div class="auth-form-fields">
+            <div class="form-group">
+              <label for="reset-email">Email</label>
+              <div class="input-wrap">
+                <svg class="lead" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>
+                <input id="reset-email" type="email" formControlName="email" autocomplete="email"
+                       placeholder="you@example.com" data-testid="reset-email" />
+              </div>
+              @if (forgotForm.controls.email.invalid && forgotForm.controls.email.touched) {
+                <span class="field-error">Enter the email address on your account</span>
+              }
+            </div>
+          </div>
+          <button type="submit" class="btn-accent submit-btn" [disabled]="resetBusy()" data-testid="reset-request">
+            {{ resetBusy() ? 'Sending code…' : 'Send code' }}
+          </button>
+        </form>
+        <button type="button" class="link-btn back-link" (click)="backToLogin()">← Back to sign in</button>
+      } @else if (mode() === 'reset') {
+        <header class="auth-head">
+          <h2>Choose a new password</h2>
+          <p>Enter the code sent to {{ forgotForm.value.email }} and your new password.</p>
+        </header>
+        @if (resetNotice()) {
+          <div class="success-banner" role="status"><span class="icon">✓</span><span>{{ resetNotice() }}</span></div>
+        }
+        @if (resetError()) {
+          <div class="error-banner" role="alert"><span class="icon">!</span><span>{{ resetError() }}</span></div>
+        }
+        <form class="auth-surface" [formGroup]="resetForm" (ngSubmit)="resetPassword()" novalidate>
+          <div class="auth-form-fields">
+            <div class="form-group">
+              <label for="reset-code">Code</label>
+              <input id="reset-code" inputmode="numeric" maxlength="6" formControlName="code"
+                     autocomplete="one-time-code" placeholder="123456" data-testid="reset-code" />
+              @if (resetForm.controls.code.invalid && resetForm.controls.code.touched) {
+                <span class="field-error">The code is six digits</span>
+              }
+            </div>
+            <div class="form-group">
+              <label for="reset-password">New password</label>
+              <input id="reset-password" [type]="showPassword() ? 'text' : 'password'" formControlName="password"
+                     autocomplete="new-password" data-testid="reset-password" />
+            </div>
+            <div class="form-group">
+              <label for="reset-confirm">Confirm new password</label>
+              <input id="reset-confirm" [type]="showPassword() ? 'text' : 'password'" formControlName="confirmPassword"
+                     autocomplete="new-password" data-testid="reset-confirm" />
+            </div>
+            @if (resetForm.value.password && newPasswordProblems().length) {
+              <ul class="pw-rules" aria-label="Still needed">
+                @for (p of newPasswordProblems(); track p) {
+                  <li>{{ p }}</li>
+                }
+              </ul>
+            }
+          </div>
+          <button type="submit" class="btn-accent submit-btn" [disabled]="resetBusy()" data-testid="reset-submit">
+            {{ resetBusy() ? 'Saving…' : 'Change password' }}
+          </button>
+        </form>
+        <div class="reset-links">
+          <button type="button" class="link-btn" (click)="mode.set('forgot')">Send a new code</button>
+          <button type="button" class="link-btn" (click)="backToLogin()">Back to sign in</button>
+        </div>
+      } @else {
+        <header class="auth-head">
+          <h2>Welcome back</h2>
+          <p>Sign in to access your trading workspace</p>
+        </header>
+
+        @if (errorMessage()) {
+          <div class="error-banner" role="alert">
+            <span class="icon">!</span>
+            <span>{{ errorMessage() }}</span>
+          </div>
+        }
+
+        @if (successMessage()) {
+          <div class="success-banner" role="status" data-testid="register-success">
+            <span class="icon">✓</span>
+            <span>{{ successMessage() }}</span>
+          </div>
+        }
+
+        <form class="auth-surface" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+          <div class="auth-form-fields">
+            <div class="form-group">
+              <label for="username">Username or email</label>
+              <div class="input-wrap">
+                <svg class="lead" viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 3.6-6 8-6s8 2 8 6"/></svg>
+                <input
+                  id="username"
+                  type="text"
+                  formControlName="username"
+                  autocomplete="username"
+                  placeholder="your.username"
+                  data-testid="username-input"
+                />
+              </div>
+              @if (form.controls.username.invalid && form.controls.username.touched) {
+                <span class="field-error">Username is required</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="password">Password</label>
+              <div class="input-wrap">
+                <svg class="lead" viewBox="0 0 24 24"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+                <input
+                  id="password"
+                  [type]="showPassword() ? 'text' : 'password'"
+                  formControlName="password"
+                  autocomplete="current-password"
+                  placeholder="••••••••••••"
+                  data-testid="password-input"
+                  (keyup)="checkCaps($event)"
+                  (keydown)="checkCaps($event)"
+                />
+                <button type="button" class="pw-toggle" (click)="showPassword.set(!showPassword())"
+                        [attr.aria-label]="showPassword() ? 'Hide password' : 'Show password'"
+                        [attr.aria-pressed]="showPassword()">
+                  @if (showPassword()) {
+                    <svg viewBox="0 0 24 24"><path d="M2 12s3.8-7 10-7 10 7 10 7-3.8 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                  } @else {
+                    <svg viewBox="0 0 24 24"><path d="M3 3l18 18"/><path d="M10.6 10.7a3 3 0 0 0 4.2 4.2"/><path d="M9.9 5.1A10.9 10.9 0 0 1 12 5c5.5 0 9.6 4.1 10.8 7-.5 1.2-1.5 2.8-2.9 4.1"/><path d="M6 6.2C4 7.6 2.7 9.5 2 12c1.2 2.9 5.3 7 10 7 1.5 0 3-.3 4.2-.9"/></svg>
+                  }
+                </button>
+              </div>
+              @if (capsLock()) {
+                <span class="caps-hint">Caps Lock is on</span>
+              }
+              @if (form.controls.password.invalid && form.controls.password.touched) {
+                <span class="field-error">Password is required</span>
+              }
+            </div>
+          </div>
+
+          <div class="forgot-row">
+            <button type="button" class="link-btn" (click)="openForgot()" data-testid="forgot-link">Forgot password?</button>
+          </div>
+
+          <button
+            type="submit"
+            class="btn-accent submit-btn"
+            [disabled]="form.invalid || loading()"
+            data-testid="login-submit"
+          >
+            @if (loading()) {
+              <span class="spinner" style="width:16px;height:16px;"></span>
+              Signing in…
+            } @else {
+              Sign in
+              <svg class="i i-sm" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+            }
+          </button>
+        </form>
+      }
+
+      <div class="auth-divider">New to Akatsuki?</div>
+      <a routerLink="/register" class="btn-ghost alt-btn" data-testid="go-register">Create an account</a>
+
+      <div class="trust">
+        <span><svg viewBox="0 0 24 24"><path d="M12 3 4 6v6c0 5 3.4 8.5 8 9 4.6-.5 8-4 8-9V6l-8-3Z"/></svg>Signed sessions</span>
+        <span><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>Delayed market data</span>
+        <span><svg viewBox="0 0 24 24"><path d="M20 6 9 17l-5-5"/></svg>Accounts approved by an administrator</span>
+      </div>
+    </div>
+  </main>
+</div>

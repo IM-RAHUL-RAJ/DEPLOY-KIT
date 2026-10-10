@@ -1,0 +1,67 @@
+spring:
+  datasource:
+    url: jdbc:h2:mem:testdb;DB_CLOSE_DELAY=-1;MODE=PostgreSQL;NON_KEYWORDS=VALUE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password:
+  sql:
+    init:
+      mode: always
+      data-locations: classpath:test-data.sql
+      schema-locations: classpath:test-schema.sql
+
+mybatis:
+  mapper-locations: classpath:mapper/*.xml
+  configuration:
+    map-underscore-to-camel-case: true
+
+jwt:
+  secret: test-secret-key-that-is-at-least-32-bytes-long
+  issuer: auth-service
+
+# Every key the main application.yml takes from Config/.env, with test values.
+server:
+  port: 8081
+services:
+  order:
+    url: http://localhost
+cors:
+  allowed-origins: http://localhost:4200
+topics:
+  orders: orders
+  trade-events: trade-events
+  market-data: market-data
+groq:
+  api-key:
+  base-url: https://groq.test/openai/v1
+  model: test-model
+  timeout-seconds: 10
+
+# The Kafka consumers (notifications and price alerts) are real @KafkaListener beans in a real
+# deployment. Integration tests run without a broker, so the beans are switched off here and the
+# tests exercise the decode and record paths directly instead.
+spring.kafka.bootstrap-servers: localhost:1
+spring.kafka.producer.properties.max.block.ms: 1000
+
+trade-api:
+  kafka:
+    consumers:
+      enabled: false
+
+# The strategy sweep runs on a timer against the market-data cache; tests drive the
+# engine directly instead, so a background sweep cannot race them.
+# The order-notification sweep runs on a timer; tests call it directly.
+notifications:
+  order-sweep:
+    enabled: false
+
+strategy:
+  sweep:
+    enabled: false
+    interval-ms: 15000
+  trade-api-url:
+  order-timeout: 30000
+
+logging:
+  level:
+    com.trading: DEBUG

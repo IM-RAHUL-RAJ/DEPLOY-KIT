@@ -1,0 +1,313 @@
+<div class="auto-page">
+  <!-- Summary -->
+  <section class="stats">
+    <div class="stat">
+      <span class="stat-label">Active</span>
+      <span class="stat-value live">{{ counts().ACTIVE }}</span>
+      <span class="stat-hint">watching the price</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Paused</span>
+      <span class="stat-value">{{ counts().DISABLED }}</span>
+      <span class="stat-hint">kept, not trading</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Done</span>
+      <span class="stat-value">{{ counts().COMPLETED }}</span>
+      <span class="stat-hint">target reached and traded</span>
+    </div>
+    <div class="stat">
+      <span class="stat-label">Slots left</span>
+      <span class="stat-value">{{ slotsLeft() }}<small>/{{ maxStrategies }}</small></span>
+      <span class="stat-hint">per account</span>
+    </div>
+  </section>
+
+  @if (error()) {
+    <div class="error-banner" role="alert"><span class="icon">!</span><span>{{ error() }}</span></div>
+  }
+  @if (notice()) {
+    <div class="success-banner" role="status"><span class="icon">✓</span><span>{{ notice() }}</span></div>
+  }
+
+  <!-- Composer -->
+  <section class="composer">
+    <div class="card compose-card">
+      <header class="compose-head">
+        <h2>New price target</h2>
+        <p>Pick an instrument, a quantity and the price to act at. The platform watches the price for you.</p>
+      </header>
+
+      <!-- 1. Instrument -->
+      <div class="step">
+        <span class="step-num">1</span>
+        <div class="step-body">
+          <h3>Instrument</h3>
+          <form class="sym-search" (ngSubmit)="submitSymbol()">
+            <input name="sym" [ngModel]="symbolInput()" (ngModelChange)="symbolInput.set($event)" maxlength="20"
+                   autocomplete="off" placeholder="Any symbol, e.g. AAPL" aria-label="Instrument symbol" />
+            <button type="submit" class="btn-ghost btn-sm">Use</button>
+          </form>
+          @if (picks().length) {
+            <div class="picks" role="listbox" aria-label="Your instruments">
+              @for (p of picks(); track p.symbol) {
+                <button type="button" role="option" class="pick" [class.active]="symbol() === p.symbol"
+                        [attr.aria-selected]="symbol() === p.symbol" (click)="chooseSymbol(p.symbol)">
+                  <span class="pick-sym">{{ p.symbol }}</span>
+                  @if (p.price !== null) {
+                    <span class="pick-price">{{ money.displayFrom(p.currency, p.price) }}</span>
+                  }
+                  @if (p.held > 0) {
+                    <span class="pick-tag">Held {{ p.held }}</span>
+                  }
+                </button>
+              }
+            </div>
+          }
+
+          @if (symbol(); as s) {
+            <div class="value-card">
+              <div class="value-main">
+                <button type="button" class="value-sym chart-symbol" (click)="charts.open(s)" title="Open full chart">{{ s }}</button>
+                @if (quoteLoading()) {
+                  <span class="muted">Fetching price…</span>
+                } @else if (price() !== null) {
+                  <span class="value-price">{{ money.formatNative(display(), displayPrice()) }}
+                    @if (currency() && currency() !== display()) {
+                      <small>{{ price() | number: '1.2-2' }} {{ currency() }}</small>
+                    }
+                  </span>
+                  @if (dayChange(); as d) {
+                    <span class="value-change" [class.up]="d.change >= 0" [class.down]="d.change < 0">
+                      {{ d.change >= 0 ? '+' : '' }}{{ d.change | number: '1.2-2' }} ({{ d.percent >= 0 ? '+' : '' }}{{ d.percent | number: '1.2-2' }}%)
+                    </span>
+                  }
+                }
+              </div>
+              <div class="value-facts">
+                <span>Bid <b>{{ money.displayFrom(currency(), quote()?.bid) }}</b></span>
+                <span>Ask <b>{{ money.displayFrom(currency(), quote()?.ask) }}</b></span>
+                <span>You hold <b>{{ held() }}</b></span>
+                @if (quote()?.stale) {
+                  <span class="pill pill-warn">Delayed</span>
+                }
+              </div>
+              @if (quoteError()) {
+                <p class="field-error">{{ quoteError() }}</p>
+              }
+            </div>
+          }
+        </div>
+      </div>
+
+      <!-- 2. The order -->
+      <div class="step">
+        <span class="step-num">2</span>
+        <div class="step-body">
+          <h3>Order <span class="muted order-kind">· market order, once</span></h3>
+          <div class="order-grid">
+            <div class="form-group field">
+              <label>Side</label>
+              <div class="seg" role="radiogroup" aria-label="Buy or sell">
+                <button type="button" role="radio" class="buy" [class.active]="side() === 'BUY'"
+                        [attr.aria-checked]="side() === 'BUY'" (click)="setSide('BUY')">Buy</button>
+                <button type="button" role="radio" class="sell" [class.active]="side() === 'SELL'"
+                        [attr.aria-checked]="side() === 'SELL'" (click)="setSide('SELL')">Sell</button>
+              </div>
+            </div>
+            <div class="form-group field">
+              <label for="qty-t">Quantity</label>
+              <div class="stepper">
+                <button type="button" (click)="step(-1)" [disabled]="quantity() <= 1" aria-label="Fewer">−</button>
+                <input id="qty-t" type="number" min="1" [ngModel]="quantity()" (ngModelChange)="setQuantity($event)" />
+                <button type="button" (click)="step(1)" aria-label="More">+</button>
+              </div>
+            </div>
+            <div class="form-group field span-all">
+              <label for="tgt">Target price <small>{{ display() }}</small></label>
+              <input id="tgt" type="number" min="0.0001" step="0.01" [ngModel]="targetPrice()" (ngModelChange)="setTarget($event)" />
+              @if (displayPrice() !== null) {
+                <div class="nudges" aria-label="Set the target relative to today's price">
+                  @for (n of [-5, -2, 2, 5]; track n) {
+                    <button type="button" (click)="targetAt(n)">{{ n > 0 ? '+' : '' }}{{ n }}%</button>
+                  }
+                </div>
+              }
+            </div>
+          </div>
+
+          @if (targetPrice() && symbol()) {
+            <p class="estimate" [class.warn]="targetMetNow()">
+              <b>{{ side() === 'BUY' ? 'Buy' : 'Sell' }} {{ quantity() }} {{ symbol() }}</b> at market once the price is
+              {{ side() === 'BUY' ? 'at or below' : 'at or above' }} <b>{{ money.formatNative(display(), targetPrice()) }}</b>
+              ≈ <b>{{ money.formatNative(display(), targetValue()) }}</b>.
+              @if (targetGap() !== null) {
+                @if (targetMetNow()) {
+                  The price is already there, so it trades on the next quote.
+                } @else {
+                  Today {{ money.formatNative(display(), displayPrice()) }},
+                  {{ (targetGap()! < 0 ? -targetGap()! : targetGap()!) | number: '1.1-1' }}% away.
+                }
+              }
+            </p>
+          }
+        </div>
+      </div>
+
+      @if (formError()) {
+        <div class="error-banner" role="alert"><span class="icon">!</span><span>{{ formError() }}</span></div>
+      }
+
+      <footer class="compose-foot">
+        <p class="muted">
+          Checked against the market poller's latest quote. The first time the price reaches your target a market
+          order is placed through the order API, then the target is marked done. A sell needs the shares; pausing
+          takes effect at once.
+        </p>
+        <button type="button" class="btn-accent create-btn" (click)="create()"
+                [disabled]="saving() || !symbol() || slotsLeft() === 0">
+          {{ saving() ? 'Arming…' : slotsLeft() === 0 ? 'No slots left' : 'Arm price target' }}
+        </button>
+      </footer>
+    </div>
+
+    <div class="card chart-card">
+      @if (symbol(); as s) {
+        <header class="chart-head">
+          <h3>{{ s }} <span class="muted">· price</span></h3>
+        </header>
+        <app-price-chart [symbol]="s" [height]="420" />
+      } @else {
+        <div class="chart-empty">
+          <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 15l3-4 3 3 5-7"/></svg>
+          <p>Choose an instrument to see its chart.</p>
+        </div>
+      }
+    </div>
+  </section>
+
+  <!-- Board -->
+  <section class="board">
+    <header class="board-head">
+      <h2>Your price targets</h2>
+      <div class="board-filters" role="tablist" aria-label="Filter price targets">
+        @for (f of filters; track f.value) {
+          <button type="button" role="tab" [class.active]="boardFilter() === f.value"
+                  [attr.aria-selected]="boardFilter() === f.value" (click)="boardFilter.set(f.value)">
+            {{ f.label }} <span class="count">{{ counts()[f.value] }}</span>
+          </button>
+        }
+      </div>
+    </header>
+
+    @if (loading()) {
+      <div class="cards">
+        @for (i of [1, 2, 3]; track i) {
+          <div class="card strat skeleton"></div>
+        }
+      </div>
+    } @else if (strategies().length === 0) {
+      <div class="card board-empty">
+        <svg viewBox="0 0 24 24"><path d="M12 8v8M8 12h8"/><circle cx="12" cy="12" r="9"/></svg>
+        <p>No price targets yet. Arm one above; it trades once when the price gets there.</p>
+      </div>
+    } @else if (board().length === 0) {
+      <div class="card board-empty"><p class="muted">Nothing in this view.</p></div>
+    } @else {
+      <div class="cards">
+        @for (s of board(); track s.strategyId) {
+          <article class="card strat" [class]="'card strat st-' + s.status.toLowerCase()">
+            <header class="strat-head">
+              <button type="button" class="strat-sym chart-symbol" (click)="charts.open(s.symbol)">{{ s.symbol }}</button>
+              <div class="strat-title">
+                <span class="strat-name">{{ s.name }}</span>
+                <span class="strat-rule">{{ describe(s) }}</span>
+              </div>
+              <span class="status" [class]="'status st-' + s.status.toLowerCase()">
+                <span class="dot"></span>{{ statusLabel(s.status) }}
+              </span>
+            </header>
+
+            <p class="strat-state">{{ stateLabel(s) }}</p>
+
+            <dl class="strat-facts">
+              <div><dt>Side</dt><dd>{{ s.side === 'SELL' ? 'Sell' : 'Buy' }}</dd></div>
+              <div><dt>Quantity</dt><dd>{{ s.quantity }}</dd></div>
+              <div><dt>Target</dt><dd>{{ priceOf(s.symbol, s.targetPrice) }}</dd></div>
+              <div><dt>Order</dt><dd>Market</dd></div>
+            </dl>
+
+            <p class="strat-checked">
+              @if (s.lastEvaluatedAt) {
+                Last checked {{ s.lastEvaluatedAt | date: 'MMM d, HH:mm' }} at {{ priceOf(s.symbol, s.lastPrice) }}
+              } @else {
+                Not evaluated yet
+              }
+            </p>
+
+            @if (s.status === 'STOPPED' && s.stopReason) {
+              <p class="stop-reason">{{ s.stopReason }}</p>
+            }
+
+            <footer class="strat-actions">
+              @if (canToggleStatus(s)) {
+                <button type="button" class="btn-ghost btn-sm" (click)="toggleStatus(s)" [disabled]="busyId() === s.strategyId">
+                  {{ s.status === 'ACTIVE' ? 'Pause' : 'Resume' }}
+                </button>
+              }
+              <button type="button" class="btn-ghost btn-sm" (click)="toggleDetail(s)" [attr.aria-expanded]="!!details()[s.strategyId]">
+                {{ details()[s.strategyId] ? 'Hide activity' : 'Activity' }}
+              </button>
+              @if (canDelete(s)) {
+                <button type="button" class="btn-ghost btn-sm btn-danger-ghost" (click)="askDelete(s)">Delete</button>
+              }
+            </footer>
+
+            @if (details()[s.strategyId]; as d) {
+              <div class="activity">
+                @if (d.loading) {
+                  <p class="muted">Loading activity…</p>
+                } @else {
+                  @if (d.preview; as p) {
+                    <p class="explain">{{ p.explanation }}</p>
+                  }
+                  @if (d.executions.length === 0) {
+                    <p class="muted">No trade yet. It acts when the price reaches the target.</p>
+                  } @else {
+                    <ul class="execs">
+                      @for (e of d.executions; track e.executionId) {
+                        <li>
+                          <span class="ex-signal" [class.sell]="e.signal === 'SELL'">{{ e.signal }} {{ e.quantity }}</span>
+                          <span class="mono">&#64; {{ priceOf(s.symbol, e.price) }}</span>
+                          <span class="pill" [class.pill-live]="e.status === 'PLACED'" [class.pill-danger]="e.status === 'FAILED'">{{ e.status }}</span>
+                          <span class="ex-time">{{ e.createdAt | date: 'MMM d, HH:mm' }}</span>
+                          @if (e.reason) {
+                            <span class="ex-reason">{{ e.reason }}</span>
+                          }
+                        </li>
+                      }
+                    </ul>
+                  }
+                }
+              </div>
+            }
+          </article>
+        }
+      </div>
+    }
+  </section>
+</div>
+
+@if (confirmDelete(); as s) {
+  <div class="dialog-backdrop" (click)="confirmDelete.set(null)"></div>
+  <div class="dialog" role="alertdialog" aria-modal="true" aria-labelledby="del-title">
+    <div class="dialog-head">
+      <h2 id="del-title" class="dialog-title">Delete “{{ s.name }}”?</h2>
+    </div>
+    <p class="dialog-copy">It stops watching the price and its history is removed. An order it already placed stays in your blotter.</p>
+    <div class="dialog-actions">
+      <button type="button" class="btn-ghost" (click)="confirmDelete.set(null)">Keep it</button>
+      <button type="button" class="btn-accent" (click)="doDelete()">Delete</button>
+    </div>
+  </div>
+}

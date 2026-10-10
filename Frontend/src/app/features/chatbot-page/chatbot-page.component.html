@@ -1,0 +1,111 @@
+<div class="cb">
+  <!-- Conversation -->
+  <section class="cb-main">
+    <header class="cb-head">
+      <div class="cb-id">
+        <span class="cb-orb" aria-hidden="true"><span></span></span>
+        <div>
+          <h1>Akatsuki Assistant</h1>
+          <span class="cb-status"><span class="dot"></span> Online · answers from your account and live market data</span>
+        </div>
+      </div>
+      <button type="button" class="btn-ghost btn-sm cb-new" (click)="newChat()">
+        <svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+        New chat
+      </button>
+    </header>
+
+    <div class="cb-thread" #thread aria-live="polite">
+      @if (fresh()) {
+        <div class="cb-welcome">
+          <span class="cb-orb big" aria-hidden="true"><span></span></span>
+          <h2>How can I help you trade today?</h2>
+          <p>Ask about your holdings, orders or any instrument, or tell me what to buy or sell. I confirm every order before it is placed.</p>
+          <div class="cb-suggest">
+            @for (g of suggestionGroups; track g.title) {
+              <button type="button" class="cb-suggest-card" (click)="ask(g.prompts[0])" [disabled]="busy()">
+                <span class="ic"><svg viewBox="0 0 24 24"><path [attr.d]="g.icon"/></svg></span>
+                <b>{{ g.title }}</b>
+                <span>“{{ g.prompts[0] }}”</span>
+              </button>
+            }
+          </div>
+        </div>
+      }
+
+      @for (msg of messages(); track msg.id) {
+        <div class="msg" [class.msg-bot]="msg.role === 'bot'" [class.msg-user]="msg.role === 'user'">
+          @if (msg.role === 'bot') {
+            <span class="avatar bot" aria-hidden="true"><span></span></span>
+          }
+          <div class="msg-body">
+            <div class="bubble">{{ msg.text }}</div>
+            @if (msg.actions?.length) {
+              <div class="msg-actions">
+                @for (action of msg.actions; track action.id + action.label) {
+                  <button class="action-chip" [class.primary]="action.id === 'confirm-order'"
+                          [class.danger]="action.id === 'cancel-order'" (click)="runAction(action)">
+                    {{ action.label }}
+                  </button>
+                }
+              </div>
+            }
+          </div>
+          @if (msg.role === 'user') {
+            <span class="avatar user" aria-hidden="true">You</span>
+          }
+        </div>
+      }
+
+      @if (busy()) {
+        <div class="msg msg-bot">
+          <span class="avatar bot" aria-hidden="true"><span></span></span>
+          <div class="msg-body">
+            <div class="bubble typing" aria-label="Assistant is typing"><span></span><span></span><span></span></div>
+          </div>
+        </div>
+      }
+    </div>
+
+    @if (confirmError()) {
+      <div class="error-banner cb-error" role="alert">
+        <span class="icon">!</span>
+        <span>{{ confirmError() }}</span>
+      </div>
+    }
+
+    <div class="cb-composer">
+      <div class="cb-input">
+        <svg class="lead" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <input
+          type="text"
+          class="chatbot-input"
+          placeholder="Ask about your portfolio, a price, or say “buy 2 AAPL”…"
+          (keydown.enter)="sendChatMessage()"
+          #chatInput
+          aria-label="Chat message input"
+        />
+        <button class="send-btn" (click)="sendChatMessage()" [disabled]="busy()" aria-label="Send message">
+          <svg viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+      <p class="cb-hint">Press Enter to send · Orders always ask for your confirmation first</p>
+    </div>
+  </section>
+
+  <!-- Side rail -->
+  <aside class="cb-side">
+    <h3>Try asking</h3>
+    @for (g of suggestionGroups; track g.title) {
+      <div class="cb-group">
+        <span class="cb-group-title">
+          <svg viewBox="0 0 24 24"><path [attr.d]="g.icon"/></svg>{{ g.title }}
+        </span>
+        @for (p of g.prompts; track p) {
+          <button type="button" class="cb-prompt" (click)="ask(p)" [disabled]="busy()">{{ p }}</button>
+        }
+      </div>
+    }
+    <p class="cb-note">Answers use delayed market data and your own account only. Nothing here is investment advice.</p>
+  </aside>
+</div>

@@ -1,0 +1,234 @@
+<div class="blotter-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Order Audit Blotter</h1>
+      <p class="page-subtitle">Real-time audit log of submitted, working, filled, and rejected orders</p>
+    </div>
+    <div class="header-actions">
+      <div class="refresh-status">
+        @if (isPolling()) {
+        <span class="poll-indicator live-indicator">
+          <span class="poll-dot"></span>
+          <span class="poll-text">Live · next in {{ secondsToRefresh() }}s</span>
+        </span>
+        } @else if (hasOpenOrders()) {
+        <span class="poll-indicator idle">
+          <span class="poll-dot idle"></span>
+          <span class="poll-text">Still working · press Refresh</span>
+        </span>
+        } @else {
+        <span class="poll-indicator settled">
+          <span class="poll-dot settled"></span>
+          <span class="poll-text">All settled</span>
+        </span>
+        }
+        <span class="last-updated">Updated {{ formatTime(lastUpdated()) }}</span>
+      </div>
+
+
+      <button class="btn-ghost" (click)="manualRefresh()" [disabled]="refreshing() || loading()">
+        <svg class="i i-sm" [class.spin]="refreshing()" viewBox="0 0 24 24">
+          <path d="M21 12a9 9 0 1 1-3-6.7L21 8" />
+          <path d="M21 3v5h-5" />
+        </svg>
+        {{ refreshing() ? 'Refreshing…' : 'Refresh' }}
+      </button>
+
+      <a routerLink="/order" class="btn-accent">
+        <svg class="i i-sm" viewBox="0 0 24 24">
+          <path d="M12 5v14M5 12h14" />
+        </svg>
+        New Order
+      </a>
+    </div>
+  </div>
+
+  @if (isPolling()) {
+  <div class="working-banner card">
+    <span class="spinner"></span>
+    <div class="working-body">
+      <span>
+        Watching {{ openCount() }} working order(s) · checking for updates
+      </span>
+    </div>
+  </div>
+  }
+
+  @if (settledNotice()) {
+  <div class="settled-banner card">
+    <svg class="i i-sm" viewBox="0 0 24 24">
+      <path d="m5 13 4 4L19 7" />
+    </svg>
+    <span>{{ settledNotice() }}</span>
+  </div>
+  }
+
+  @if (pollingExhausted()) {
+  <div class="exhausted-banner card" role="status">
+    <svg class="i i-sm" viewBox="0 0 24 24">
+      <path d="M12 9v4M12 17h.01" />
+      <path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0z" />
+    </svg>
+    {{ openCount() }} order(s) still working. A limit order waits until the market reaches
+    its price, or until the end-of-day close. This page stopped checking automatically after
+    {{ maxPollAttempts }} checks; press Refresh to check again.
+  </div>
+  }
+
+  @if (loading()) {
+  <div class="loading-state card">
+    <span class="spinner"></span>
+    <span>Retrieving order history from audit database…</span>
+  </div>
+  } @else if (errorMessage()) {
+  <div class="error-banner card">
+    <span class="icon">!</span>
+    <span>{{ errorMessage() }}</span>
+  </div>
+  } @else if (orders().length === 0) {
+  <div class="card empty-state">
+    <svg class="i" style="width:38px;height:38px;opacity:.6" viewBox="0 0 24 24">
+      <path d="M4 4h16v16H4z" />
+      <path d="M4 9h16M9 9v11" />
+    </svg>
+    <p>No orders recorded in audit trail. <a routerLink="/order">Execute your first order</a></p>
+  </div>
+  } @else {
+  <div class="card table-card">
+    <div class="blotter-summary">
+      <span><strong>{{ orders().length }}</strong> total</span>
+      <span class="dot-sep"></span>
+      <span><strong>{{ openCount() }}</strong> working</span>
+      <span class="dot-sep"></span>
+      <span><strong>{{ settledCount() }}</strong> settled</span>
+      @if (isPolling()) {
+      <span class="live-tag"><span class="poll-dot sm"></span> live</span>
+      }
+    </div>
+    <div class="table-wrapper">
+      <table class="blotter-table">
+        <thead>
+          <tr>
+            <th>Order ID</th>
+            <th>Symbol</th>
+            <th>Side</th>
+            <th>Type</th>
+            <th class="right">Qty</th>
+            <th class="right">Limit Price</th>
+            <th class="right">Executed Price</th>
+            <th class="status-col">Status</th>
+            <th>Timestamp</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (order of orders(); track order.orderId) {
+          <tr [class.row-new]="order.status === 'NEW'" [class.row-flash]="isFlashing(order.orderId)"
+            [class.row-rejected]="order.status === 'REJECTED'" [class.row-filled]="order.status === 'FILLED'"
+            [class.row-cancelled]="order.status === 'CANCELLED'" (click)="showRejection(order, $event)">
+            <td class="mono order-id" [title]="order.orderId">{{ order.orderId }}</td>
+            <td><span class="symbol-tag mono" [appChartSymbol]="order.symbol">{{ order.symbol }}</span></td>
+            <td [class.side-buy]="order.side === 'BUY'" [class.side-sell]="order.side === 'SELL'">
+              {{ order.side }}
+            </td>
+            <td>
+              <span class="type-pill" [class.type-market]="isMarket(order)" data-testid="order-type">
+                {{ isMarket(order) ? 'Market' : 'Limit' }}
+              </span>
+            </td>
+            <td class="right mono text-bold">{{ order.quantity | number }}</td>
+            <td class="right mono" data-testid="limit-price">
+              @if (isMarket(order)) {
+              <span class="muted" title="A market order has no limit price">—</span>
+              } @else {
+              {{ fmtAccountCurrency(order.price) }}
+              }
+            </td>
+            <td class="right mono" data-testid="executed-price">
+              @if (order.executedPrice) {
+              <span class="executed">{{ fmtAccountCurrency(order.executedPrice) }}</span>
+              } @else {
+              <span class="muted">—</span>
+              }
+            </td>
+            <td class="status-cell">
+              @if (order.status === 'REJECTED') {
+              <button type="button" class="reason-trigger"
+                (click)="$event.stopPropagation(); showRejection(order, $event)"
+                [attr.aria-label]="'Why was order ' + order.orderId + ' rejected?'" data-testid="rejection-trigger">
+                <span [class]="badgeClass(order.status)">{{ order.status }}</span>
+                <span class="reason">{{ rejectionText(order.rejectionReason) }}</span>
+                <span class="reason-more" aria-hidden="true">Why?</span>
+              </button>
+              } @else {
+              <div class="status-stack">
+                <span [class]="badgeClass(order.status)">{{ order.status }}</span>
+                @if (order.status === 'NEW') {
+                <span class="muted reason">working</span>
+                }
+              </div>
+              }
+            </td>
+            <td class="muted time mono">{{ formatDate(order.createdOn) }}</td>
+            <td class="action-col" (click)="$event.stopPropagation()">
+              @if (order.status === 'NEW') {
+              <button class="btn-ghost btn-small" (click)="cancelOrder(order.orderId)"
+                [disabled]="cancelling() === order.orderId" title="Cancel this order">
+                @if (cancelling() === order.orderId) {
+                <span class="spinner" style="width:14px;height:14px;"></span>
+                } @else {
+                Cancel
+                }
+              </button>
+              }
+            </td>
+          </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+  </div>
+  }
+  @if (rejectionOpen(); as o) {
+  <div class="dialog-backdrop" (click)="closeRejection()"></div>
+  <div class="dialog card" role="dialog" aria-modal="true" aria-labelledby="rejection-title"
+    aria-describedby="rejection-detail" (keydown.escape)="closeRejection()" data-testid="rejection-dialog">
+    <div class="dialog-head">
+      <span class="badge badge-rejected">REJECTED</span>
+      <h2 id="rejection-title" class="dialog-title">{{ rejection()?.label }}</h2>
+      <button #dialogClose type="button" class="dialog-close" (click)="closeRejection()" aria-label="Close">
+        <svg class="i i-sm" viewBox="0 0 24 24">
+          <path d="M6 6l12 12M18 6 6 18" />
+        </svg>
+      </button>
+    </div>
+
+    <p id="rejection-detail" class="dialog-detail">{{ rejection()?.detail }}</p>
+    <p class="dialog-next"><strong>What you can do:</strong> {{ rejection()?.nextStep }}</p>
+
+    <dl class="dialog-facts">
+      <dt>Order</dt>
+      <dd class="mono">{{ o.orderId }}</dd>
+      <dt>Instrument</dt>
+      <dd class="mono"><span [appChartSymbol]="o.symbol">{{ o.symbol }}</span></dd>
+      <dt>Side</dt>
+      <dd [class.side-buy]="o.side === 'BUY'" [class.side-sell]="o.side === 'SELL'">{{ o.side }}</dd>
+      <dt>Quantity</dt>
+      <dd class="mono">{{ o.quantity | number }}</dd>
+      <dt>{{ (o.orderType ?? 'LIMIT') === 'MARKET' ? 'Price at placement' : 'Limit price' }}</dt>
+      <dd class="mono">{{ fmtAccountCurrency(o.price) }}</dd>
+      <dt>Order value</dt>
+      <dd class="mono">{{ fmtAccountCurrency(o.price * o.quantity) }}</dd>
+      <dt>Placed</dt>
+      <dd>{{ formatDate(o.createdOn) }}</dd>
+      <dt>Executor code</dt>
+      <dd class="mono" data-testid="rejection-code">{{ o.rejectionReason || 'none recorded' }}</dd>
+    </dl>
+
+    <div class="dialog-actions">
+      <a routerLink="/order" class="btn-accent">Place a new order</a>
+      <button type="button" class="btn-ghost" (click)="closeRejection()">Close</button>
+    </div>
+  </div>
+  }
+</div>

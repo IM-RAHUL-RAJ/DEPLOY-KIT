@@ -1,0 +1,3 @@
+# Using default bytecode mock maker instead of inline to avoid conflicts with Mockito 5.14.2 on Java 21
+# mock-maker=inline
+# enable-inlining=true

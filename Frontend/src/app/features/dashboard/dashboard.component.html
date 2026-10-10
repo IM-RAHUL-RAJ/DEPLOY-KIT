@@ -1,0 +1,225 @@
+<div class="dashboard">
+
+  @if (watchedLoaded()) {
+    <section class="watch-strip" aria-label="Watchlist">
+      <header class="watch-strip-head">
+        <span class="watch-strip-title">
+          <span class="live-dot"></span> Watchlist
+        </span>
+        <a routerLink="/watchlist" class="watch-strip-link">
+          {{ watched().length ? 'Open watchlist' : 'Add instruments' }} →
+        </a>
+      </header>
+      @if (watched().length) {
+        <app-watchlist-carousel [items]="watched()" [compact]="true" (pick)="charts.open($event.symbol)" />
+      } @else {
+        <p class="watch-strip-empty">Your watchlist is empty. Add instruments to follow them here.</p>
+      }
+    </section>
+  }
+
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Executive Dashboard</h1>
+    </div>
+    <a routerLink="/order" class="btn-accent">
+      <svg class="i i-sm" viewBox="0 0 24 24">
+        <path d="M12 5v14M5 12h14" />
+      </svg>
+      Place Order
+    </a>
+  </div>
+
+  @if (loading()) {
+  <div class="loading-state card">
+    <span class="spinner"></span>
+    <span>Connecting to trading network…</span>
+  </div>
+  } @else if (errorMessage()) {
+  <div class="error-banner card">
+    <span class="icon">⚠️</span>
+    <span>{{ errorMessage() }}</span>
+  </div>
+  } @else {
+  <!-- KPI grid -->
+  <div class="stats-grid">
+    <div class="card stat-card stat-hero">
+      <div class="stat-glow"></div>
+      <div class="stat-top">
+        <span class="stat-label">Total Equity</span>
+        <span class="chip chip-live">
+          <svg class="i i-sm" viewBox="0 0 24 24">
+            <path d="M3 3v18h18" />
+            <path d="m7 14 3-4 3 3 4-6" />
+          </svg>
+          Live
+        </span>
+      </div>
+      <div class="stat-value mono">{{ fmtAccountCurrency(totalEquity()) }}</div>
+      <div class="stat-foot">
+        <span class="stat-sub">Cash + positions at average cost</span>
+      </div>
+    </div>
+
+    <div class="card stat-card">
+      <span class="stat-label">Available Cash</span>
+      <div class="stat-value mono positive">{{ fmtAccountCurrency(cash()) }}</div>
+      <div class="stat-sub">
+        {{ currency.ledger() }} account
+        @if (currency.converted()) { · shown in {{ currency.selected() }} }
+      </div>
+    </div>
+
+    <div class="card stat-card">
+      <span class="stat-label">Positions Value</span>
+      <div class="stat-value mono">{{ fmtAccountCurrency(positionsValue()) }}</div>
+      <div class="stat-sub">{{ positions().length }} instrument(s) held · avg cost × qty</div>
+    </div>
+
+    <div class="card stat-card">
+      <span class="stat-label">Order Flow</span>
+      <div class="stat-value mono">{{ orders().length }}</div>
+      <div class="stat-sub">
+        <span class="dot" [class.dot-live]="openOrderCount() > 0"></span>
+        {{ openOrderCount() }} working · {{ orders().length - openOrderCount() }} settled
+      </div>
+    </div>
+  </div>
+
+  <div class="main-grid">
+    <!-- Recent orders -->
+    <div class="left-col">
+      <div class="card recent-card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Recent Orders</h2>
+            <span class="card-sub">Latest activity from the audit trail</span>
+          </div>
+          <a routerLink="/blotter" class="btn-ghost">View blotter</a>
+        </div>
+        @if (recentOrders().length === 0) {
+        <div class="empty-state">
+          <p>No orders recorded yet.</p>
+          <a routerLink="/order" class="btn-accent">Place your first trade</a>
+        </div>
+        } @else {
+        <div class="table-wrapper">
+          <table class="data-table">
+            <thead>
+              <tr>
+                <th>Symbol</th>
+                <th>Side</th>
+                <th class="right">Qty</th>
+                <th class="right">Price</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (order of recentOrders(); track order.orderId) {
+              <tr>
+                <td><span class="symbol-tag mono" [appChartSymbol]="order.symbol">{{ order.symbol }}</span></td>
+                <td [class.positive]="order.side === 'BUY'" [class.negative]="order.side === 'SELL'">
+                  {{ order.side }}
+                </td>
+                <td class="right mono">{{ order.quantity | number }}</td>
+                <td class="right mono">{{ fmtAccountCurrency(order.price) }}</td>
+                <td><span [class]="statusClass(order.status)">{{ order.status }}</span></td>
+              </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+        }
+      </div>
+    </div>
+
+    <!-- Allocation + holdings -->
+    <div class="right-col">
+      <div class="card alloc-card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Allocation</h2>
+            <span class="card-sub">Portfolio composition</span>
+          </div>
+        </div>
+        <div class="alloc-body">
+          <div class="donut" [style.background]="donutGradient()">
+            <div class="donut-hole">
+              <span class="donut-value mono" [title]="fmtAccountCurrency(totalEquity())">{{ fmtCompact(totalEquity()) }}</span>
+              <span class="donut-label">Total</span>
+            </div>
+          </div>
+          <div class="legend">
+            @for (slice of allocation(); track slice.label) {
+            <div class="legend-row">
+              <span class="legend-dot" [style.background]="slice.color"></span>
+              <span class="legend-label" [title]="slice.label">{{ slice.label }}</span>
+              <span class="legend-value mono">{{ fmtCompact(slice.value) }}</span>
+              <span class="legend-pct mono">{{ slice.pct | number:'1.1-1' }}%</span>
+            </div>
+            }
+            @if (allocation().length === 0) {
+            <span class="text-muted">No capital allocated.</span>
+            }
+          </div>
+        </div>
+      </div>
+
+      <div class="card positions-card">
+        <div class="card-header">
+          <div>
+            <h2 class="card-title">Holdings</h2>
+            <span class="card-sub">
+              {{ holdingsView() === 'value' ? 'Top 3 by invested value' : 'Top 3 most recently bought' }}
+            </span>
+          </div>
+          <div class="holdings-switch" role="tablist" aria-label="Sort holdings">
+            <button type="button" role="tab" [class.active]="holdingsView() === 'value'"
+              [attr.aria-selected]="holdingsView() === 'value'" (click)="setHoldingsView('value')">
+              Top value
+            </button>
+            <button type="button" role="tab" [class.active]="holdingsView() === 'recent'"
+              [attr.aria-selected]="holdingsView() === 'recent'" (click)="setHoldingsView('recent')">
+              Recent
+            </button>
+          </div>
+        </div>
+        @if (holdings().length === 0) {
+        <div class="empty-state">
+          <p>No open positions.</p>
+          <a routerLink="/order" class="btn-ghost">Open a position</a>
+        </div>
+        } @else {
+        <div class="holdings-list">
+          @for (h of topHoldings(); track h.symbol) {
+          <div class="holding-row">
+            <span class="symbol-tag mono" [appChartSymbol]="h.symbol">{{ h.symbol }}</span>
+            <div class="holding-mid">
+              <span class="mono">{{ h.quantity | number }} × {{ fmtAccountCurrency(h.averageCost) }}</span>
+              <span class="holding-mark text-muted">
+                @if (h.live) { live {{ fmtAccountCurrency(h.mark) }} } @else { no live price }
+              </span>
+            </div>
+            <div class="holding-right">
+              <span class="mono" title="Average cost × quantity">{{ fmtAccountCurrency(h.value) }}</span>
+              @if (h.returnPct !== null) {
+              <span class="mono" [class.positive]="h.returnPct >= 0" [class.negative]="h.returnPct < 0"
+                title="Return: live price against average cost">
+                {{ h.returnPct >= 0 ? '+' : '' }}{{ h.returnPct | number:'1.2-2' }}%
+              </span>
+              }
+            </div>
+          </div>
+          }
+        </div>
+        @if (holdings().length > topHoldings().length) {
+        <a routerLink="/holdings" class="holdings-more">
+          View all {{ holdings().length }} holdings
+        </a>
+        }
+        }
+      </div>
+    </div>
+  </div>
+  }
+</div>

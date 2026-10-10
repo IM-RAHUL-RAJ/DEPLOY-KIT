@@ -1,0 +1,14 @@
+.git
+.idea
+.vscode
+node_modules
+dist
+.angular
+coverage
+playwright-report
+test-results
+e2e
+*.log
+.env
+Dockerfile*
+.dockerignore*

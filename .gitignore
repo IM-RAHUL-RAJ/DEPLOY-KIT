@@ -1,0 +1,48 @@
+# Sprint 9 specific ignores
+# Local environment overrides
+.env
+.env.local
+*.local.env
+
+# Local state files
+.etl_trigger.lock
+.*.lock
+
+# Log files
+*.log
+*.err.log
+*.out.log
+
+# Cache and temporary files
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.ipynb_checkpoints/
+*.egg-info/
+
+# Database files
+*.duckdb
+*.duckdb.wal
+analytics.duckdb
+
+# Node/npm
+node_modules/
+npm-debug.log*
+yarn-error.log*
+
+# IDE
+.vscode/
+.idea/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Optional docs folders removed from this branch
+catalogue/
+decision-log/
+reports/
+security-review/

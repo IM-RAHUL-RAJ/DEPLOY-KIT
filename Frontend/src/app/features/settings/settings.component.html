@@ -1,0 +1,288 @@
+<div class="ext-page narrow settings-page">
+  <header class="page-header">
+    <div>
+      <h1 class="page-title">Settings</h1>
+      <p class="page-subtitle">Everything you can tailor: notifications, display, trading defaults and charts</p>
+    </div>
+  </header>
+
+  @if (!accountState.preferenceLoaded()) {
+    <div class="card state-card inline">
+      <span class="spinner"></span>
+      <span>Loading your preferences…</span>
+    </div>
+  } @else if (accountState.preference() === null) {
+    <div class="error-banner" role="alert">
+      <span class="icon">!</span>
+      <span>Your preferences could not be loaded.</span>
+      <button type="button" class="btn-ghost" (click)="accountState.retryPreference()">Retry</button>
+    </div>
+  } @else {
+    @if (accountState.accountNotice()) {
+      <div class="error-banner notice-banner" role="alert">
+        <span class="icon">!</span>
+        <span>{{ accountState.accountNotice() }}</span>
+      </div>
+    }
+
+    @if (accountState.preferenceSaveError()) {
+      <div class="error-banner notice-banner" role="alert">
+        <span class="icon">!</span>
+        <span>{{ accountState.preferenceSaveError() }}</span>
+      </div>
+    }
+
+    @if (saved()) {
+      <div class="success-banner" role="status">
+        <span class="icon">&#10003;</span>
+        <span>Preferences saved.</span>
+      </div>
+    }
+
+    <section class="card section-card settings-card">
+      <div class="section-head">
+        <div>
+          <h2>Default delivery</h2>
+          <p>
+            Where every notification goes unless a category below says otherwise: in-app toasts on this
+            terminal, email, or both. An email address is only kept when email is part of the choice.
+          </p>
+        </div>
+      </div>
+
+      <div class="form-group">
+        <label>Channel</label>
+        <div class="segmented channel-segment" role="radiogroup" aria-label="Default alert channel">
+          @for (c of channels; track c.value) {
+            <button
+              type="button"
+              role="radio"
+              class="channel-option"
+              [class.active]="channel() === c.value"
+              [attr.aria-checked]="channel() === c.value"
+              (click)="chooseChannel(c.value)"
+            >
+              {{ c.label }}
+            </button>
+          }
+        </div>
+      </div>
+
+      @if (needsEmail(channel())) {
+        <div class="form-group">
+          <label for="alert-contact">Email address</label>
+          <input
+            id="alert-contact"
+            type="email"
+            [ngModel]="contact()"
+            (ngModelChange)="contact.set($event)"
+            placeholder="name@example.com"
+          />
+          @if (contactError()) {
+            <span class="field-error">{{ contactError() }}</span>
+          }
+        </div>
+      }
+    </section>
+
+    <section class="card section-card settings-card">
+      <div class="section-head">
+        <div>
+          <h2>Delivery by category</h2>
+          <p>
+            Set how each category reaches you. Every account, order and price notification follows its
+            category; Follow default uses the delivery above. In-app is a toast on this terminal. Every delivery
+            attempt is recorded in your notifications.
+          </p>
+        </div>
+      </div>
+
+      @if (categoriesLoading()) {
+        <div class="state-card inline compact">
+          <span class="spinner"></span>
+          <span>Loading your notification preferences…</span>
+        </div>
+      } @else if (categoriesError()) {
+        <div class="error-banner" role="alert">
+          <span class="icon">!</span>
+          <span>{{ categoriesError() }}</span>
+          <button type="button" class="btn-ghost" (click)="loadCategories()">Retry</button>
+        </div>
+      } @else {
+        <div class="table-scroll">
+        <table class="data-table preferences-table">
+          <thead>
+            <tr>
+              <th>Category</th>
+              <th>Delivery</th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (category of categories(); track category.categoryLevel) {
+              <tr>
+                <td class="type-cell">
+                  <div>{{ category.label }}</div>
+                  <div class="category-types">{{ category === categories()[0] ? 'Account notifications' : category === categories()[1] ? 'Order notifications' : 'Price notifications' }}</div>
+                </td>
+                <td>
+                  <select
+                    class="type-channel"
+                    [ngModel]="category.channel"
+                    (ngModelChange)="updateCategory(category, { channel: $event })"
+                    [attr.aria-label]="'Delivery for ' + category.label"
+                  >
+                    @for (choice of categoryChannels; track choice) {
+                      <option [value]="choice">{{ categoryChannelLabel(choice) }}</option>
+                    }
+                  </select>
+                  <span class="field-hint delivery-note">{{ deliveryNote(category) }}</span>
+                </td>
+                <td>
+                  @if (needsEmail(category.channel)) {
+                    <input
+                      type="email"
+                      [ngModel]="category.contact"
+                      (ngModelChange)="updateCategory(category, { contact: $event })"
+                      placeholder="name@example.com"
+                      [attr.aria-label]="'Email for ' + category.label"
+                    />
+                    @if (categoryContactProblem(category)) {
+                      <span class="field-error">{{ categoryContactProblem(category) }}</span>
+                    }
+                  } @else {
+                    <span class="text-muted">&mdash;</span>
+                  }
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        </div>
+        @if (categorySaveError()) {
+          <div class="error-banner category-save-error" role="alert">
+            <span class="icon">!</span>
+            <span>{{ categorySaveError() }}</span>
+          </div>
+        }
+      }
+    </section>
+
+    <section class="card section-card settings-card">
+      <div class="section-head">
+        <div>
+          <h2>Display currency</h2>
+          <p>
+            Amounts are shown in this currency wherever they appear. Your account ledger stays the same; the rates
+            used are the platform's reference rates, and every amount remains as-is on the server.
+          </p>
+        </div>
+      </div>
+
+      <div class="form-group currency-field">
+        <label for="display-currency">Show amounts in</label>
+        <select id="display-currency" [ngModel]="displayCurrency()" (ngModelChange)="displayCurrency.set($event)">
+          @for (opt of currency.options; track opt.code) {
+            <option [value]="opt.code">{{ opt.code }} — {{ opt.name }}</option>
+          }
+        </select>
+      </div>
+    </section>
+
+    <section class="card section-card settings-card">
+      <div class="section-head">
+        <div>
+          <h2>Appearance</h2>
+          <p>The terminal's colour scheme. Saved to your account as soon as you pick it, so it follows you to any browser.</p>
+        </div>
+      </div>
+      <div class="segmented pref-segment" role="radiogroup" aria-label="Theme">
+        <button type="button" role="radio" [class.active]="theme.currentTheme() === 'dark'"
+                [attr.aria-checked]="theme.currentTheme() === 'dark'" (click)="theme.setTheme('dark')">Dark</button>
+        <button type="button" role="radio" [class.active]="theme.currentTheme() === 'light'"
+                [attr.aria-checked]="theme.currentTheme() === 'light'" (click)="theme.setTheme('light')">Light</button>
+      </div>
+    </section>
+
+    <div class="settings-actions">
+      <span class="settings-actions-note">Delivery and currency are saved to your account when you press Save.</span>
+      <button type="button" class="btn-accent" [disabled]="saving()" (click)="save()">
+        {{ saving() ? 'Saving…' : 'Save preferences' }}
+      </button>
+    </div>
+
+    <div class="device-divider">
+      <span>On this device</span>
+      <small>Applied and saved instantly</small>
+    </div>
+
+    <section class="card section-card settings-card">
+      <div class="section-head">
+        <div>
+          <h2>Trading defaults</h2>
+          <p>How the order ticket opens. You can always change both on the ticket itself.</p>
+        </div>
+      </div>
+      <div class="pref-grid">
+        <div class="form-group">
+          <label>Default order type</label>
+          <div class="segmented pref-segment" role="radiogroup" aria-label="Default order type">
+            <button type="button" role="radio" [class.active]="ui.defaultOrderType() === 'MARKET'"
+                    [attr.aria-checked]="ui.defaultOrderType() === 'MARKET'" (click)="ui.defaultOrderType.set('MARKET')">Market</button>
+            <button type="button" role="radio" [class.active]="ui.defaultOrderType() === 'LIMIT'"
+                    [attr.aria-checked]="ui.defaultOrderType() === 'LIMIT'" (click)="ui.defaultOrderType.set('LIMIT')">Limit</button>
+          </div>
+          <span class="field-hint">Market fills at the best available price; limit waits for your price.</span>
+        </div>
+        <div class="form-group">
+          <label for="default-qty">Default quantity from a chart</label>
+          <input id="default-qty" type="number" min="1" [ngModel]="ui.defaultQuantity()"
+                 (ngModelChange)="setDefaultQuantity($event)" />
+          <span class="field-hint">Pre-filled when you press Trade on an instrument's chart.</span>
+        </div>
+      </div>
+    </section>
+
+    <section class="card section-card settings-card">
+      <div class="section-head">
+        <div>
+          <h2>Charts</h2>
+          <p>How every price chart opens: in the instrument view, on Trade Advice and on Automated Trading.</p>
+        </div>
+      </div>
+      <div class="pref-grid">
+        <div class="form-group">
+          <label>Style</label>
+          <div class="segmented pref-segment" role="radiogroup" aria-label="Chart style">
+            @for (s of chartStyles; track s.value) {
+              <button type="button" role="radio" [class.active]="ui.chartStyle() === s.value"
+                      [attr.aria-checked]="ui.chartStyle() === s.value" (click)="ui.chartStyle.set(s.value)">{{ s.label }}</button>
+            }
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Default range</label>
+          <div class="segmented pref-segment" role="radiogroup" aria-label="Default chart range">
+            @for (r of chartRanges; track r) {
+              <button type="button" role="radio" [class.active]="ui.chartRange() === r"
+                      [attr.aria-checked]="ui.chartRange() === r" (click)="ui.chartRange.set(r)">{{ r }}</button>
+            }
+          </div>
+        </div>
+        <label class="switch-row">
+          <input type="checkbox" [ngModel]="ui.showAverages()" (ngModelChange)="ui.showAverages.set($event)" />
+          <span class="switch"></span>
+          <span>Show 20- and 50-day moving averages</span>
+        </label>
+        <label class="switch-row">
+          <input type="checkbox" [ngModel]="ui.showVolume()" (ngModelChange)="ui.showVolume.set($event)" />
+          <span class="switch"></span>
+          <span>Show volume bars</span>
+        </label>
+      </div>
+      <div class="pref-reset">
+        <button type="button" class="btn-ghost btn-sm" (click)="ui.reset()">Restore device defaults</button>
+      </div>
+    </section>
+  }
+</div>

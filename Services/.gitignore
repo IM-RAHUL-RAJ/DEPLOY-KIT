@@ -1,0 +1,31 @@
+# Services directory ignores
+# Log files from all services
+*.log
+*.err.log
+*.out.log
+
+# Lock and state files
+.etl_trigger.lock
+.*.lock
+
+# DuckDB files
+*.duckdb
+*.duckdb.wal
+analytics.duckdb
+
+# Build outputs
+target/
+dist/
+build/
+*.jar
+*.war
+
+# IDE
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# OS
+.DS_Store
+Thumbs.db

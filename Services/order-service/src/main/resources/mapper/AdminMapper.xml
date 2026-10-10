@@ -1,0 +1,215 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.mapper.AdminMapper">
+
+    <select id="countUsers" resultType="long">
+        SELECT COUNT(*) FROM auth.users
+    </select>
+
+    <sql id="userColumns">
+        u.user_id       AS userId,
+        u.uuid::text    AS uuid,
+        u.first_name    AS firstName,
+        u.last_name     AS lastName,
+        u.username      AS username,
+        u.email         AS email,
+        CASE WHEN 'ADMIN' = ANY (u.roles) THEN 'admin' ELSE 'client' END AS userType,
+        u.phone_country_code AS phoneCountryCode,
+        u.phone_number  AS phoneNumber,
+        u.country       AS country,
+        u.risk_appetite AS riskAppetite,
+        u.status        AS status,
+        a.account_id    AS accountId,
+        a.status        AS accountStatus,
+        a.currency      AS currency,
+        a.cash_balance  AS cashBalance,
+        u.created_on    AS createdOn,
+        u.approved_on   AS approvedOn,
+        u.suspended_on  AS suspendedOn,
+        u.rejection_reason AS rejectionReason,
+        NULL::boolean AS emailDelivered
+    </sql>
+
+    <select id="findAllUsers" resultType="com.trading.tradeapi.dto.AdminUserDto">
+        SELECT <include refid="userColumns"/>
+        FROM auth.users u
+        LEFT JOIN account a ON a.user_id = u.user_id
+        ORDER BY u.user_id ASC
+    </select>
+
+    <select id="findUserById" resultType="com.trading.tradeapi.dto.AdminUserDto">
+        SELECT <include refid="userColumns"/>
+        FROM auth.users u
+        LEFT JOIN account a ON a.user_id = u.user_id
+        WHERE u.user_id = #{userId}
+    </select>
+
+    <select id="findUsersByStatus" resultType="com.trading.tradeapi.dto.AdminUserDto">
+        SELECT <include refid="userColumns"/>
+        FROM auth.users u
+        LEFT JOIN account a ON a.user_id = u.user_id
+        WHERE u.status = #{status}
+        ORDER BY u.created_on ASC
+    </select>
+
+    <select id="findUserIdByUuid" resultType="long">
+        SELECT user_id FROM auth.users WHERE uuid = #{uuid}::uuid
+    </select>
+
+    <select id="countUsersByStatus" resultType="long">
+        SELECT COUNT(*) FROM auth.users WHERE status = #{status}
+    </select>
+
+    <!--
+      One statement moves the user and stamps the audit columns that belong to the
+      transition. Stamping happens in the SET rather than from the old value in SQL
+      so an approval clears a previous suspension and vice versa.
+    -->
+    <update id="updateUserStatus">
+        UPDATE auth.users
+        SET status = #{newStatus},
+            approved_on = CASE WHEN #{newStatus} = 'ACTIVE' THEN now() ELSE NULL END,
+            approved_by = CASE WHEN #{newStatus} = 'ACTIVE' THEN #{actorUserId} ELSE NULL END,
+            rejected_on = CASE WHEN #{newStatus} = 'REJECTED' THEN now() ELSE NULL END,
+            rejection_reason = CASE WHEN #{newStatus} = 'REJECTED' THEN #{reason} ELSE NULL END,
+            suspended_on = CASE WHEN #{newStatus} = 'SUSPENDED' THEN now() ELSE NULL END,
+            suspended_by = CASE WHEN #{newStatus} = 'SUSPENDED' THEN #{actorUserId} ELSE NULL END
+        WHERE user_id = #{userId}
+    </update>
+
+    <insert id="logStatusChange">
+        INSERT INTO auth.status_change_log (user_id, old_status, new_status, reason, changed_by)
+        VALUES (#{userId}, #{oldStatus}, #{newStatus}, #{reason}, #{actorUserId})
+    </insert>
+
+    <select id="countAccounts" resultType="long">
+        SELECT COUNT(*) FROM account
+    </select>
+
+    <select id="countAccountsByStatus" resultType="long">
+        SELECT COUNT(*) FROM account WHERE status = #{status}
+    </select>
+
+    <select id="sumCashBalance" resultType="java.math.BigDecimal">
+        SELECT COALESCE(SUM(cash_balance), 0) FROM account
+    </select>
+
+    <select id="countInstruments" resultType="long">
+        SELECT COUNT(*) FROM instrument
+    </select>
+
+    <select id="countOrders" resultType="long">
+        SELECT COUNT(*) FROM orders
+    </select>
+
+    <select id="countOrdersByStatus" resultType="long">
+        SELECT COUNT(*) FROM orders WHERE status = #{status}
+    </select>
+
+    <select id="findAllAccounts" resultType="com.trading.tradeapi.dto.AdminAccountDto">
+        SELECT a.account_id  AS accountId,
+               a.user_id     AS userId,
+               CONCAT(u.first_name, ' ', COALESCE(u.last_name, '')) AS holderName,
+               u.username    AS username,
+               CASE WHEN 'ADMIN' = ANY (u.roles) THEN 'admin' ELSE 'client' END AS userType,
+               a.currency    AS currency,
+               a.cash_balance AS cashBalance,
+               a.status      AS status,
+               a.version     AS version
+        FROM account a
+        JOIN auth.users u ON a.user_id = u.user_id
+        ORDER BY a.account_id ASC
+    </select>
+
+    <select id="findAccountById" resultType="com.trading.tradeapi.dto.AdminAccountDto">
+        SELECT a.account_id  AS accountId,
+               a.user_id     AS userId,
+               CONCAT(u.first_name, ' ', COALESCE(u.last_name, '')) AS holderName,
+               u.username    AS username,
+               CASE WHEN 'ADMIN' = ANY (u.roles) THEN 'admin' ELSE 'client' END AS userType,
+               a.currency    AS currency,
+               a.cash_balance AS cashBalance,
+               a.status      AS status,
+               a.version     AS version
+        FROM account a
+        JOIN auth.users u ON a.user_id = u.user_id
+        WHERE a.account_id = #{accountId}
+    </select>
+
+    <update id="updateAccountStatus">
+        UPDATE account
+        SET status = #{status},
+            closed_at = CASE WHEN #{status} = 'CLOSED' THEN now() ELSE closed_at END,
+            version = version + 1
+        WHERE account_id = #{accountId}
+    </update>
+
+    <update id="addBalanceIfNotOverdrawn">
+        UPDATE account
+        SET cash_balance = cash_balance + #{amount},
+            version = version + 1
+        WHERE account_id = #{accountId}
+          AND cash_balance + #{amount} &gt;= 0
+    </update>
+
+    <insert id="logBalanceAdjustment">
+        INSERT INTO balance_adjustment (account_id, amount, reason, adjusted_by)
+        VALUES (#{accountId}, #{amount}, #{reason}, #{actorUserId})
+    </insert>
+
+    <select id="findAllOrders" resultType="com.trading.tradeapi.dto.AdminOrderDto">
+        SELECT CAST(o.order_id AS TEXT) AS orderId,
+               o.account_id   AS accountId,
+               CONCAT(u.first_name, ' ', COALESCE(u.last_name, '')) AS holderName,
+               o.ticker       AS symbol,
+               o.side         AS side,
+               CAST(o.quantity AS BIGINT) AS quantity,
+               o.price        AS price,
+               COALESCE(o.order_type, 'LIMIT') AS orderType,
+               CASE WHEN o.status = 'FILLED' THEN o.executed_price ELSE NULL END AS executedPrice,
+               o.status       AS status,
+               o.idempotency_key AS idempotencyKey,
+               o.received_at  AS createdOn
+        FROM orders o
+        JOIN account a ON a.account_id = o.account_id
+        JOIN auth.users u ON u.user_id = a.user_id
+        <where>
+            <if test="status != null and status != ''">
+                AND o.status = #{status}
+            </if>
+            <if test="accountId != null">
+                AND o.account_id = #{accountId}
+            </if>
+        </where>
+        ORDER BY o.received_at DESC, o.order_id DESC
+        <if test="limit != null and limit > 0">
+            LIMIT #{limit}
+        </if>
+    </select>
+
+    <select id="findAllInstruments" resultType="com.trading.tradeapi.dto.InstrumentDto">
+        SELECT instrument_id AS instrumentId,
+               symbol,
+               ticker,
+               asset_class AS assetClass,
+               quote_currency AS quoteCurrency,
+               status
+        FROM instrument
+        ORDER BY symbol ASC
+    </select>
+
+    <insert id="insertInstrument">
+        INSERT INTO instrument (symbol, ticker, asset_class, quote_currency, status)
+        VALUES (#{symbol}, #{ticker}, #{assetClass}, #{quoteCurrency}, #{status})
+    </insert>
+
+    <update id="updateInstrumentStatus">
+        UPDATE instrument
+        SET status = #{status},
+            delisted_at = CASE WHEN #{status} = 'DELISTED' THEN now() ELSE delisted_at END
+        WHERE instrument_id = #{instrumentId}
+    </update>
+
+</mapper>

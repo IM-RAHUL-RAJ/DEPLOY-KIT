@@ -1,0 +1,85 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.watchlist.alerts.mapper.PriceAlertMapper">
+
+    <!-- Unqualified on purpose: the datasource sets currentSchema=trading in Postgres and the
+         H2 test schema has no qualifier, exactly as the other mappers in this service do. -->
+
+    <sql id="priceAlert_columns">
+        price_alert_id   AS priceAlertId,
+        account_id       AS accountId,
+        symbol,
+        direction,
+        threshold,
+        (SELECT i.quote_currency FROM instrument i WHERE i.symbol = price_alert.symbol) AS currency,
+        status,
+        triggered_price  AS triggeredPrice,
+        triggered_at     AS triggeredAt,
+        created_at       AS createdAt
+    </sql>
+
+    <select id="findActiveBySymbol" resultType="com.trading.tradeapi.watchlist.alerts.entity.PriceAlertRecord">
+        SELECT <include refid="priceAlert_columns"/>
+        FROM price_alert
+        WHERE symbol = #{symbol}
+          AND status = 'ACTIVE'
+    </select>
+
+    <select id="findById" resultType="com.trading.tradeapi.watchlist.alerts.entity.PriceAlertRecord">
+        SELECT <include refid="priceAlert_columns"/>
+        FROM price_alert
+        WHERE price_alert_id = #{priceAlertId}
+    </select>
+
+    <select id="findActiveByAccountSymbolDirectionThreshold"
+            resultType="com.trading.tradeapi.watchlist.alerts.entity.PriceAlertRecord">
+        SELECT <include refid="priceAlert_columns"/>
+        FROM price_alert
+        WHERE account_id = #{accountId}
+          AND symbol = #{symbol}
+          AND direction = #{direction}
+          AND threshold = #{threshold}
+          AND status = 'ACTIVE'
+    </select>
+
+    <select id="findByAccount" resultType="com.trading.tradeapi.watchlist.alerts.entity.PriceAlertRecord">
+        SELECT <include refid="priceAlert_columns"/>
+        FROM price_alert
+        WHERE account_id = #{accountId}
+        ORDER BY created_at DESC, price_alert_id DESC
+    </select>
+
+    <select id="countActiveByAccount" resultType="int">
+        SELECT COUNT(*)
+        FROM price_alert
+        WHERE account_id = #{accountId}
+          AND status = 'ACTIVE'
+    </select>
+
+    <insert id="insertActive" useGeneratedKeys="true" keyProperty="priceAlertId" keyColumn="price_alert_id">
+        INSERT INTO price_alert (account_id, symbol, direction, threshold, status)
+        VALUES (#{accountId}, #{symbol}, #{direction}, #{threshold}, 'ACTIVE')
+    </insert>
+
+    <!-- Guarded: squares with the active-index truth (symbol, ACTIVE). A redelivered
+         market-data message finds status TRIGGERED and matches no row: 0 changed. -->
+    <update id="markTriggered">
+        UPDATE price_alert
+        SET status = 'TRIGGERED',
+            triggered_price = #{triggeredPrice},
+            triggered_at = #{triggeredAt}
+        WHERE price_alert_id = #{priceAlertId}
+          AND status = 'ACTIVE'
+    </update>
+
+    <update id="markCancelled">
+        UPDATE price_alert
+        SET status = 'CANCELLED'
+        WHERE price_alert_id = #{priceAlertId}
+          AND account_id = #{accountId}
+          AND status = 'ACTIVE'
+    </update>
+
+</mapper>

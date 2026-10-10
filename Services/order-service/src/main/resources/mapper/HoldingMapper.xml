@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.mapper.HoldingMapper">
+
+    <select id="findByAccountAndTicker" resultType="com.trading.tradeapi.entity.HoldingRecord">
+        SELECT holding_id AS holdingId,
+               account_id AS accountId,
+               ticker,
+               quantity,
+               average_price AS averagePrice,
+               as_of_date AS asOfDate
+        FROM holding
+        WHERE account_id = #{accountId}
+          AND ticker = #{ticker}
+    </select>
+
+    <insert id="insertHolding" useGeneratedKeys="true" keyProperty="holdingId" keyColumn="holding_id">
+        INSERT INTO holding (account_id, ticker, quantity, average_price, as_of_date)
+        VALUES (#{accountId}, #{ticker}, #{quantity}, #{averagePrice}, #{asOfDate})
+    </insert>
+
+    <update id="updateHolding">
+        UPDATE holding
+        SET quantity = #{quantity},
+            average_price = #{averagePrice},
+            as_of_date = #{asOfDate}
+        WHERE holding_id = #{holdingId}
+    </update>
+
+    <delete id="deleteHolding">
+        DELETE FROM holding
+        WHERE holding_id = #{holdingId}
+    </delete>
+
+    <select id="findHoldingsByAccountId" resultType="com.trading.tradeapi.dto.PositionResponseDto">
+        SELECT account_id AS accountId,
+               ticker AS symbol,
+               CAST(quantity AS BIGINT) AS quantity,
+               average_price AS averageCost
+        FROM holding
+        WHERE account_id = #{accountId}
+          AND quantity > 0
+        ORDER BY ticker ASC
+    </select>
+
+</mapper>

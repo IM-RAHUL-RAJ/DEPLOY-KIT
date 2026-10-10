@@ -1,0 +1,561 @@
+openapi: 3.1.0
+
+info:
+  title: Trade REST API
+  version: 1.0.0
+  summary: Order placement, order cancellation and account queries for the Enterprise Trading Platform.
+  description: |
+    Binding contract for the Sprint 6 Spring Boot service.
+  contact:
+    name: Enterprise Trading Platform, programme materials
+  license:
+    name: Instructional use only
+
+servers:
+  - url: http://localhost:8080
+    description: Local development, run from Docker Compose
+  - url: http://trade-api:8080
+    description: Service name inside the Docker Compose network
+
+tags:
+  - name: Orders
+    description: Placing and cancelling orders.
+  - name: Accounts
+    description: Account details, cash balance, holdings and order history.
+  - name: Instruments
+    description: The instrument catalogue and live quote projections.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/orders:
+    post:
+      tags: [Orders]
+      operationId: placeOrder
+      summary: Place an order
+      description: |
+        A LIMIT order is priced at the price in the body. A MARKET order must omit the
+        price: it is taken from the live book here, using the ask for a buy and the bid
+        for a sell, and converted into the account's ledger currency before the order is
+        priced or checked against the balance. The conversion uses the same reference
+        rates as the executor, so the admitted price and the fill price agree.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlaceOrderRequest'
+      responses:
+        '200':
+          description: Order accepted and recorded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '400':
+          $ref: '#/components/responses/InsufficientFunds'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          description: The account or the instrument does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Insufficient holdings for a sell, or the idempotency key has been used.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          description: >-
+            Field validation failed (VAL-422), a LIMIT order arrived without a price
+            (ORD-422), or the account's currency has no configured exchange rate
+            (FX-422).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: >-
+            No live price is available for the instrument, so the market order could
+            not be priced (MKT-503).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/orders/{id}:
+    delete:
+      tags: [Orders]
+      operationId: cancelOrder
+      summary: Cancel a working order
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Order cancelled.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OrderResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          description: No order exists with that identifier.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The order is not in a cancellable state.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/instruments/{symbol}/quote:
+    get:
+      tags: [Instruments]
+      operationId: getInstrumentQuote
+      summary: Get the live quote for an instrument
+      description: |
+        Informational only. The client uses this to show what the market is doing, but
+        a MARKET order is still priced by the service at submission time, so a quote
+        read here may already be stale by the time an order is sent.
+      parameters:
+        - name: symbol
+          in: path
+          required: true
+          schema:
+            type: string
+            minLength: 1
+            maxLength: 20
+      responses:
+        '200':
+          description: The latest available quote.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InstrumentQuoteResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '404':
+          description: The instrument is unknown or delisted.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          description: No live price is available for the instrument.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/v1/accounts/{id}:
+    get:
+      tags: [Accounts]
+      operationId: getAccount
+      summary: Get account details
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+      responses:
+        '200':
+          description: Account details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccountResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/accounts/{id}/balance:
+    get:
+      tags: [Accounts]
+      operationId: getBalance
+      summary: Get cash balance
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+      responses:
+        '200':
+          description: Cash balance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BalanceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/accounts/{id}/positions:
+    get:
+      tags: [Accounts]
+      operationId: getPositions
+      summary: Get holdings
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+      responses:
+        '200':
+          description: Holdings for the account.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PositionResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+  /api/v1/accounts/{id}/orders:
+    get:
+      tags: [Accounts]
+      operationId: getOrders
+      summary: Get order history
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/OrderStatus'
+        - name: from
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Order history for the account.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrderHistoryEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/AccountNotActive'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  parameters:
+    AccountIdPath:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+
+  responses:
+    Unauthorised:
+      description: Missing, malformed, expired or wrongly signed token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    AccountNotFound:
+      description: No account exists with that key.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    AccountNotActive:
+      description: The account is not active, or the token does not grant access to it.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InsufficientFunds:
+      description: A buy order costs more than the available cash balance.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InvalidInput:
+      description: The request failed field validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    OrderSide:
+      type: string
+      enum: [BUY, SELL]
+
+    OrderType:
+      type: string
+      enum: [MARKET, LIMIT]
+      default: LIMIT
+      description: >
+        MARKET executes at the best available price and the client sends no price at all.
+        The service takes the ask for a buy and the bid for a sell, falling back to the mid,
+        then converts the native quote into the account ledger currency before the funds
+        check. LIMIT executes only when the limit price condition is met.
+
+    OrderStatus:
+      type: string
+      enum: [NEW, FILLED, REJECTED, CANCELLED]
+
+    AccountStatus:
+      type: string
+      enum: [ACTIVE, INACTIVE, SUSPENDED, REJECTED, CLOSED]
+
+    PlaceOrderRequest:
+      type: object
+      additionalProperties: false
+      required: [accountId, symbol, side, quantity, idempotencyKey]
+      properties:
+        accountId:
+          type: integer
+          format: int64
+          minimum: 1
+        symbol:
+          type: string
+          minLength: 1
+          maxLength: 20
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        quantity:
+          type: integer
+          format: int32
+          minimum: 1
+        price:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+          multipleOf: 0.01
+          nullable: true
+          description: >-
+            Required for LIMIT, and rejected without one. A MARKET order must omit it:
+            the price is taken server-side from the live book (ask to buy, bid to sell)
+            and converted into the account's ledger currency before the order is
+            priced or checked against the balance. Any price sent with a MARKET order
+            is ignored.
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+        idempotencyKey:
+          type: string
+          minLength: 8
+          maxLength: 100
+
+    OrderResponse:
+      type: object
+      additionalProperties: false
+      required: [orderId, status, message, symbol, side, quantity, price]
+      properties:
+        orderId:
+          type: string
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        message:
+          type: string
+        symbol:
+          type: string
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        quantity:
+          type: integer
+          format: int32
+        price:
+          type: number
+          format: double
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+
+    OrderHistoryEntry:
+      type: object
+      additionalProperties: false
+      required: [orderId, accountId, symbol, side, quantity, price, status, createdOn]
+      properties:
+        orderId:
+          type: string
+        accountId:
+          type: integer
+          format: int64
+        symbol:
+          type: string
+        side:
+          $ref: '#/components/schemas/OrderSide'
+        quantity:
+          type: integer
+          format: int32
+        price:
+          type: number
+          format: double
+        orderType:
+          $ref: '#/components/schemas/OrderType'
+        executedPrice:
+          type: number
+          format: double
+          nullable: true
+        status:
+          $ref: '#/components/schemas/OrderStatus'
+        idempotencyKey:
+          type: string
+        rejectionReason:
+          type: string
+          description: Why the executor or the end-of-day job refused the order. Present only on REJECTED.
+        createdOn:
+          type: string
+          format: date-time
+
+    AccountResponse:
+      type: object
+      additionalProperties: false
+      required: [id, accountId, holderName, cashBalance, currency, status, version, lastUpdated]
+      properties:
+        id:
+          type: integer
+          format: int64
+        accountId:
+          type: string
+        holderName:
+          type: string
+        cashBalance:
+          type: number
+          format: double
+        currency:
+          type: string
+          description: ISO 4217 ledger currency of the account, fixed at registration from the chosen country.
+        status:
+          $ref: '#/components/schemas/AccountStatus'
+        version:
+          type: integer
+          format: int32
+        lastUpdated:
+          type: string
+          format: date-time
+
+    BalanceResponse:
+      type: object
+      additionalProperties: false
+      required: [accountId, cashBalance, currency, asOf]
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        cashBalance:
+          type: number
+          format: double
+        currency:
+          type: string
+        asOf:
+          type: string
+          format: date-time
+
+    PositionResponse:
+      type: object
+      additionalProperties: false
+      required: [accountId, symbol, quantity, averageCost]
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        symbol:
+          type: string
+        quantity:
+          type: integer
+          format: int32
+        averageCost:
+          type: number
+          format: double
+
+    InstrumentQuoteResponse:
+      type: object
+      additionalProperties: false
+      required: [symbol, stale]
+      properties:
+        symbol:
+          type: string
+        quoteCurrency:
+          type: string
+          nullable: true
+          description: The currency the instrument is quoted in, which need not be the account currency.
+        price:
+          type: number
+          format: double
+          nullable: true
+          description: Mid price in quoteCurrency. May be null when only one side of the book is available.
+        bid:
+          type: number
+          format: double
+          nullable: true
+          description: Highest bid. What a market sell is expected to fill at.
+        ask:
+          type: number
+          format: double
+          nullable: true
+          description: Lowest offer. What a market buy is expected to fill at.
+        stale:
+          type: boolean
+          description: True when no recent quote could be read and this is the last known price.
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      properties:
+        errorCode:
+          type: string
+          enum:
+            [
+              ACC-404,
+              ACC-403,
+              INS-404,
+              ORD-400,
+              ORD-404,
+              ORD-409,
+              ORD-422,
+              FX-422,
+              MKT-503,
+              VAL-422,
+              API-400,
+              API-404,
+              AUTH-401,
+              SRV-500,
+            ]
+        message:
+          type: string

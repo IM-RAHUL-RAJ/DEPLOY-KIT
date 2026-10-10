@@ -1,0 +1,10 @@
+# OpenAPI Generator Ignore
+# Files listed here are never written by the generator.
+#
+# api.module.ts is an NgModule, and this workspace has none: the generated
+# services are providedIn: 'root' and are configured in app.config.ts instead.
+# index.ts is the barrel that re-exports api.module.ts, so it goes with it;
+# callers import from api/api and model/models directly.
+api.module.ts
+index.ts
+git_push.sh

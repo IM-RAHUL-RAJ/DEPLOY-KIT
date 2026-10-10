@@ -1,0 +1,28 @@
+{
+  "trade-api.yaml": [
+    "ACC-404",
+    "ACC-403",
+    "INS-404",
+    "ORD-400",
+    "ORD-404",
+    "ORD-409",
+    "ORD-422",
+    "FX-422",
+    "MKT-503",
+    "VAL-422",
+    "API-400",
+    "API-404",
+    "AUTH-401",
+    "SRV-500"
+  ],
+  "auth-api.yaml": [
+    "AUTH-401",
+    "AUTH-403",
+    "AUTH-404",
+    "AUTH-409",
+    "AUTH-410",
+    "RATE-429",
+    "VAL-422",
+    "SRV-500"
+  ]
+}

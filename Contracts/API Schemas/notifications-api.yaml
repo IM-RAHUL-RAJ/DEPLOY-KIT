@@ -1,0 +1,287 @@
+openapi: 3.1.0
+
+info:
+  title: Customer notifications service
+  version: 1.0.0
+  summary: The customer's notification history, and the delivery guarantees behind it.
+  description: |
+    Binding contract for the Customer Notifications extension, built in Sprint 10. Written
+    before the module's controller existed. These routes are served by the Trade REST API on
+    8081, as a module beside the order and account routes. They are not a separate deployable.
+
+    ## Where the notifications come from
+
+    The notification module is a consumer of the `trade-events` Kafka topic, in its own
+    consumer group (`notification-service`), with the header contract in `design/kafka.md`. It
+    turns the order lifecycle outcomes into the customer's inbox:
+
+    | Event | Inbox category |
+    |---|---|
+    | `ORDER_FILLED` / `TRADE_EXECUTED` | `ORDER_FILLED` |
+    | `ORDER_REJECTED` / `TRADE_REJECTED` | `ORDER_REJECTED` |
+    | `ORDER_CANCELLED` | `ORDER_CANCELLED` |
+    | Price threshold crossed (watchlists module) | `PRICE_ALERT` |
+
+    The watchlists module never resolves a channel itself. It hands a crossed threshold to this
+    module through the `notifications.api.AlertDelivery` Java interface (never an HTTP route),
+    and this module resolves where to send it and records the outcome.
+
+    ## Delivery guarantees
+
+    - **Recorded once.** A notification row is keyed by the Kafka event id. Re-delivery of the
+      same event, which Kafka allows under at-least-once, does not create a second row and does
+      not send a second message.
+    - **Committed before sent.** The row's `QUEUED` status is persisted before outbound delivery
+      starts, so an outage during send never loses the fact that the event happened. The
+      outbound result is then recorded on the row: `SENT`, `FAILED` or `SUPPRESSED`.
+    - **The channel is genuine.** Where to send comes from the preferences module's
+      `AlertChannelResolver` (the customer's stored choice), read fresh for each message.
+      `EMAIL` goes through the service's mail stack. `PUSH` (in-app) goes through the
+      `PushSender` seam and appears in the inbox; `BOTH` does both. The routing decision and
+      the record of the attempt are real.
+    - **Logging an alert is not delivering one.** Every outcome is a row with a status, and the
+      inbox shows suppressed and failed deliveries rather than pretending they went out.
+
+    ## Honoured by the route design
+
+    The bearer token is verified as on every other `/api/**` route, and each route compares the
+    `accountId` claim against the path before it reads or writes anything. Marking a
+    notification read is idempotent: a second call for the same id answers `200` with the same
+    record.
+  contact:
+    name: Enterprise Trading Platform, programme materials
+  license:
+    name: Instructional use only
+
+servers:
+  - url: http://localhost:8081
+    description: Local development.
+  - url: http://trade-api:8081
+    description: Service name inside the Docker Compose network.
+
+tags:
+  - name: Notifications
+    description: The customer's notification history.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/notifications/{accountId}:
+    get:
+      tags: [Notifications]
+      operationId: getNotifications
+      summary: Get the notification history for one account
+      description: |
+        The inbox, newest first. Records are persisted regardless of delivery state, so success
+        and failure are both visible. Delivery status is exposed explicitly; a `SUPPRESSED`
+        record means the customer chose `NONE` at the time the event was recorded.
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+        - name: unread
+          in: query
+          required: false
+          description: When true, only notifications that have not been marked read are returned.
+          schema:
+            type: boolean
+        - name: limit
+          in: query
+          required: false
+          description: Maximum number of notifications to return.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 100
+      responses:
+        '200':
+          description: Notification history, newest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Notification'
+              examples:
+                inbox:
+                  value:
+                    - notificationId: 42
+                      accountId: 1
+                      category: ORDER_FILLED
+                      symbol: AAPL
+                      title: Order filled
+                      body: Bought 40 AAPL at 232.71.
+                      channel: EMAIL
+                      status: SENT
+                      read: true
+                      createdAt: '2026-10-19T14:05:11Z'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/notifications/{accountId}/{notificationId}/read:
+    post:
+      tags: [Notifications]
+      operationId: markNotificationRead
+      summary: Mark one notification read
+      description: |
+        Idempotent. A notification that is already read, or that belongs to another account, or
+        that does not exist, does not change the caller's access decision: the response for a
+        missing or foreign id is the same `404`, never a hint that the id exists elsewhere.
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+        - name: notificationId
+          in: path
+          required: true
+          description: The notification to mark. Must belong to the account in the path.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: The notification with its read flag set.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Notification'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        The same access token the Trade REST API accepts, issued by the auth service. The
+        signature is verified as it is on every other `/api/**` route, and each route here
+        compares the `accountId` claim against the path parameter before it reads anything.
+
+  parameters:
+    AccountIdPath:
+      name: accountId
+      in: path
+      required: true
+      description: The numeric account key, `ACCOUNTS.id`.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 1
+
+  responses:
+    Unauthorised:
+      description: Missing, malformed, expired or wrongly signed token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorised:
+              value:
+                errorCode: AUTH-401
+                message: Unauthorised
+    Forbidden:
+      description: |
+        The token is valid but its `accountId` claim does not match the account requested. The
+        account-notifications access control is the same check everywhere in this programme.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              value:
+                errorCode: ACC-403
+                message: Account not accessible
+    AccountNotFound:
+      description: The account does not exist, or the notification is not one of that account's.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                errorCode: ACC-404
+                message: Account not found
+    InvalidInput:
+      description: The request failed field validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalid:
+              value:
+                errorCode: VAL-422
+                message: Invalid input
+
+  schemas:
+
+    Notification:
+      type: object
+      additionalProperties: false
+      required: [notificationId, accountId, category, title, body, channel, status, read, createdAt]
+      properties:
+        notificationId:
+          type: integer
+          format: int64
+        accountId:
+          type: integer
+          format: int64
+        category:
+          type: string
+          enum: [ORDER_FILLED, ORDER_REJECTED, ORDER_CANCELLED, PRICE_ALERT]
+        symbol:
+          type: [string, 'null']
+          description: The instrument the event is about, when there is one.
+        title:
+          type: string
+        body:
+          type: string
+        channel:
+          type: string
+          enum: [NONE, EMAIL, PUSH, BOTH]
+          description: The channel the record was resolved to, never the contact itself.
+        status:
+          type: string
+          enum: [QUEUED, SENT, FAILED, SUPPRESSED]
+          description: |
+            - `QUEUED` - persisted, outbound not finished.
+            - `SENT` - the channel accepted the message.
+            - `FAILED` - the channel could not be reached (e.g. mail not configured).
+            - `SUPPRESSED` - the customer's channel was `NONE` or had no destination.
+        read:
+          type: boolean
+          description: True once the customer has marked it read.
+        createdAt:
+          type: string
+          format: date-time
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      properties:
+        errorCode:
+          type: string
+          enum: [ACC-404, ACC-403, AUTH-401, VAL-422]
+          description: |
+            The platform error codes, used unchanged. No code is invented for this module: a
+            notification that is not one of the path account's is `ACC-404`, and an account that
+            does not exist is `ACC-404`.
+        message:
+          type: string

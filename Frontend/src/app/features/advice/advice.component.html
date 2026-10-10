@@ -1,0 +1,274 @@
+<div class="advice-page">
+  <!-- Toolbar -->
+  <section class="adv-toolbar">
+    <form class="adv-search" (ngSubmit)="analyse()">
+      <svg viewBox="0 0 24 24" class="adv-search-icon"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input name="q" [ngModel]="query()" (ngModelChange)="query.set($event)" maxlength="20" autocomplete="off"
+             placeholder="Analyse any symbol — AAPL, MSFT, INFY.NS" aria-label="Symbol to analyse" />
+      <button type="submit" class="btn-accent btn-sm" [disabled]="searching()">
+        {{ searching() ? 'Analysing…' : 'Analyse' }}
+      </button>
+    </form>
+    <div class="adv-filters" role="tablist" aria-label="Filter signals">
+      @for (f of filters; track f) {
+        <button type="button" role="tab" [attr.aria-selected]="filter() === f" [class.active]="filter() === f"
+                [class]="'flt flt-' + f.toLowerCase()" (click)="filter.set(f)">
+          {{ f === 'ALL' ? 'All' : f }} <span class="count">{{ counts()[f] }}</span>
+        </button>
+      }
+    </div>
+    <div class="adv-meta">
+      @if (asOf()) {
+        <span>Computed {{ asOf() | date: 'MMM d, HH:mm' }}</span>
+      }
+      <button type="button" class="btn-ghost btn-sm" (click)="load()" [disabled]="loading()">Refresh</button>
+    </div>
+  </section>
+
+  @if (searchError()) {
+    <div class="error-banner" role="alert"><span class="icon">!</span><span>{{ searchError() }}</span></div>
+  }
+  @if (error()) {
+    <div class="error-banner" role="alert">
+      <span class="icon">!</span><span>{{ error() }}</span>
+      <button type="button" class="btn-ghost btn-sm" (click)="load()">Retry</button>
+    </div>
+  }
+
+  <div class="adv-layout">
+    <!-- Signal list -->
+    <aside class="adv-list card">
+      <header class="adv-list-head">
+        <h2>Your instruments</h2>
+        <span>Holdings and watchlist</span>
+      </header>
+      @if (loading()) {
+        @for (i of [1, 2, 3, 4]; track i) {
+          <div class="sig-row skeleton"></div>
+        }
+      } @else if (signals().length === 0) {
+        <div class="adv-empty">
+          <p>Nothing held or watched yet.</p>
+          <p class="muted">Add instruments to your watchlist, or analyse any symbol above.</p>
+        </div>
+      } @else if (filtered().length === 0) {
+        <div class="adv-empty"><p class="muted">No {{ filter() }} signals right now.</p></div>
+      } @else {
+        <ul class="sig-list">
+          @for (s of filtered(); track s.symbol) {
+            <li>
+              <button type="button" class="sig-row" [class.selected]="selectedSymbol() === s.symbol" (click)="select(s.symbol)">
+                <div class="sig-main">
+                  <span class="sig-symbol">{{ s.symbol }}</span>
+                  <span class="sig-sources">
+                    @for (src of s.sources; track src) {
+                      <span class="src">{{ sourceLabel(src) }}</span>
+                    }
+                  </span>
+                </div>
+                <div class="sig-side">
+                  <span class="sig-badge" [class]="'sig-badge ' + actionClass(s)">{{ s.status === 'SIGNAL' ? s.action : 'No data' }}</span>
+                  @if (s.status === 'SIGNAL') {
+                    <span class="mini-score" [attr.aria-label]="'Score ' + s.score">
+                      <span class="mini-track"><span class="mini-mark" [style.left.%]="scorePos(s.score)"></span></span>
+                      <span class="mini-num">{{ s.score > 0 ? '+' : '' }}{{ s.score }}</span>
+                    </span>
+                  }
+                </div>
+              </button>
+            </li>
+          }
+        </ul>
+      }
+    </aside>
+
+    <!-- Detail -->
+    <main class="adv-detail">
+      @if (selected(); as s) {
+        <section class="card hero" [class]="'card hero ' + actionClass(s)">
+          <div class="hero-top">
+            <div class="hero-id">
+              <button type="button" class="hero-symbol chart-symbol" (click)="openChart(s.symbol)" title="Open chart">{{ s.symbol }}</button>
+              <span class="hero-price">
+                @if (s.indicators.lastPrice !== null) {
+                  {{ s.indicators.lastPrice | number: '1.2-2' }}
+                }
+                @if (s.priceAsOf) {
+                  <small>as of {{ s.priceAsOf | date: 'MMM d, HH:mm' }}</small>
+                }
+              </span>
+            </div>
+            <div class="hero-verdict">
+              <span class="verdict" [class]="'verdict ' + actionClass(s)">{{ s.status === 'SIGNAL' ? s.action : 'NO SIGNAL' }}</span>
+              @if (s.status === 'SIGNAL') {
+                <span class="strength">{{ s.strength }}% conviction</span>
+              }
+            </div>
+          </div>
+          <p class="hero-summary">{{ s.summary }}</p>
+
+          @if (s.status === 'SIGNAL') {
+            <div class="gauge" [attr.aria-label]="'Score ' + s.score + ' of plus or minus 5'">
+              <div class="gauge-track">
+                <span class="zone sell"></span><span class="zone hold"></span><span class="zone buy"></span>
+                <span class="gauge-mark" [style.left.%]="scorePos(s.score)">
+                  <b>{{ s.score > 0 ? '+' : '' }}{{ s.score }}</b>
+                </span>
+              </div>
+              <div class="gauge-labels"><span>-5 Sell</span><span>Hold</span><span>Buy +5</span></div>
+            </div>
+          }
+
+          <div class="hero-actions">
+            <button type="button" class="btn-accent btn-sm" (click)="trade(s.symbol)">Trade {{ s.symbol }}</button>
+            <button type="button" class="btn-ghost btn-sm" (click)="automate(s.symbol)">Automate</button>
+            <button type="button" class="btn-ghost btn-sm" (click)="openChart(s.symbol)">Full chart</button>
+          </div>
+        </section>
+
+        <section class="card chart-card">
+          <app-price-chart [symbol]="s.symbol" [height]="300" [overlays]="['sma20', 'sma50', 'bollinger']" />
+        </section>
+
+        @if (s.status === 'SIGNAL') {
+          <section class="card factors-card">
+            <header class="card-head">
+              <h3>Why: five factors</h3>
+              <span class="muted">Each scores +1 bullish, 0 neutral or −1 bearish</span>
+            </header>
+            <ul class="factors">
+              @for (f of s.factors; track f.key) {
+                <li class="factor">
+                  <span class="f-score" [class.pos]="f.score > 0" [class.neg]="f.score < 0">
+                    {{ f.score > 0 ? '+1' : f.score < 0 ? '−1' : '0' }}
+                  </span>
+                  <div class="f-body">
+                    <span class="f-name">{{ f.name }} <em>{{ scoreLabel(f.score) }}</em></span>
+                    <span class="f-reason">{{ f.reason }}</span>
+                  </div>
+                </li>
+              }
+            </ul>
+          </section>
+
+          <section class="ind-grid">
+            <article class="card ind">
+              <h4>Moving averages</h4>
+              <dl>
+                <div><dt>SMA 20</dt><dd>{{ s.indicators.sma20 | number: '1.2-2' }}</dd></div>
+                <div><dt>SMA 50</dt><dd>{{ s.indicators.sma50 | number: '1.2-2' }}</dd></div>
+                <div><dt>SMA 200</dt><dd>{{ s.indicators.sma200 !== null ? (s.indicators.sma200 | number: '1.2-2') : 'needs 200 days' }}</dd></div>
+              </dl>
+            </article>
+
+            <article class="card ind">
+              <h4>RSI (14) <span class="zone-tag">{{ rsiZone(s.indicators.rsi14) }}</span></h4>
+              <div class="big-num">{{ s.indicators.rsi14 | number: '1.1-1' }}</div>
+              <div class="scale rsi">
+                <span class="band low"></span><span class="band mid"></span><span class="band high"></span>
+                <span class="scale-mark" [style.left.%]="s.indicators.rsi14 ?? 50"></span>
+              </div>
+              <div class="scale-labels"><span>0</span><span>30</span><span>70</span><span>100</span></div>
+            </article>
+
+            <article class="card ind">
+              <h4>MACD (12, 26, 9)</h4>
+              <dl>
+                <div><dt>MACD</dt><dd>{{ s.indicators.macd | number: '1.2-2' }}</dd></div>
+                <div><dt>Signal</dt><dd>{{ s.indicators.macdSignal | number: '1.2-2' }}</dd></div>
+                <div><dt>Histogram</dt>
+                  <dd [class.pos]="(s.indicators.macdHistogram ?? 0) > 0" [class.neg]="(s.indicators.macdHistogram ?? 0) < 0">
+                    {{ s.indicators.macdHistogram | number: '1.2-2' }}
+                  </dd>
+                </div>
+              </dl>
+            </article>
+
+            <article class="card ind">
+              <h4>Bollinger (20, 2)</h4>
+              <dl>
+                <div><dt>Upper</dt><dd>{{ s.indicators.bollingerUpper | number: '1.2-2' }}</dd></div>
+                <div><dt>Middle</dt><dd>{{ s.indicators.bollingerMiddle | number: '1.2-2' }}</dd></div>
+                <div><dt>Lower</dt><dd>{{ s.indicators.bollingerLower | number: '1.2-2' }}</dd></div>
+                <div><dt>%B</dt><dd>{{ s.indicators.percentB | number: '1.2-2' }}</dd></div>
+              </dl>
+            </article>
+
+            <article class="card ind wide">
+              <h4>52-week range</h4>
+              <div class="range-row">
+                <span class="mono">{{ s.indicators.low52w | number: '1.2-2' }}</span>
+                <div class="scale range">
+                  <span class="scale-mark" [style.left.%]="between(s.indicators.lastPrice, s.indicators.low52w, s.indicators.high52w)"></span>
+                </div>
+                <span class="mono">{{ s.indicators.high52w | number: '1.2-2' }}</span>
+              </div>
+              <p class="muted small">
+                Price is {{ between(s.indicators.lastPrice, s.indicators.low52w, s.indicators.high52w) | number: '1.0-0' }}%
+                of the way from the low to the high.
+                @if (s.indicators.volatility !== null) {
+                  Annualised volatility {{ s.indicators.volatility | number: '1.1-1' }}%.
+                }
+                {{ s.indicators.dailyCloses }} daily closes used.
+              </p>
+            </article>
+
+            @if (s.holding; as h) {
+              <article class="card ind wide holding">
+                <h4>Your position</h4>
+                <dl>
+                  <div><dt>Quantity</dt><dd>{{ h.quantity }}</dd></div>
+                  <div><dt>Average cost</dt><dd>{{ h.averageCost | number: '1.2-2' }}</dd></div>
+                  <div><dt>Unrealised</dt>
+                    <dd [class.pos]="(h.unrealisedPnlPercent ?? 0) >= 0" [class.neg]="(h.unrealisedPnlPercent ?? 0) < 0">
+                      {{ h.unrealisedPnlPercent !== null ? ((h.unrealisedPnlPercent >= 0 ? '+' : '') + (h.unrealisedPnlPercent | number: '1.2-2') + '%') : '—' }}
+                    </dd>
+                  </div>
+                </dl>
+              </article>
+            }
+          </section>
+        } @else {
+          <section class="card insufficient">
+            <h3>Not enough history yet</h3>
+            @for (r of s.reasons; track $index) {
+              <p>{{ r }}</p>
+            }
+            <p class="muted">The platform fetches a year of daily prices for every instrument it tracks; check back once it has arrived.</p>
+          </section>
+        }
+
+        <section class="card method-card">
+          <button type="button" class="method-toggle" (click)="showMethod.set(!showMethod())" [attr.aria-expanded]="showMethod()">
+            <span>How this is calculated</span>
+            <svg viewBox="0 0 24 24" [class.open]="showMethod()"><path d="m6 9 6 6 6-6"/></svg>
+          </button>
+          @if (showMethod()) {
+            @if (methodology(); as m) {
+              <p class="method-summary">{{ m.summary }}</p>
+              <ul class="formulas">
+                @for (f of m.factors; track f.key) {
+                  <li>
+                    <span class="formula-name">{{ f.name }}</span>
+                    <code>{{ f.formula }}</code>
+                    <span class="formula-rule">{{ f.rule }}</span>
+                  </li>
+                }
+              </ul>
+              <p class="method-summary"><b>Scoring.</b> {{ m.scoring }}</p>
+            } @else {
+              <p class="muted">Loading the methodology…</p>
+            }
+          }
+        </section>
+
+        <p class="disclaimer">{{ disclaimer() }}</p>
+      } @else if (!loading()) {
+        <section class="card adv-empty big">
+          <svg viewBox="0 0 24 24"><path d="M9 18h6M10 22h4"/><path d="M12 2a7 7 0 0 0-4 12.7V17h8v-2.3A7 7 0 0 0 12 2z"/></svg>
+          <p>Select an instrument, or analyse any symbol, to see its signal.</p>
+        </section>
+      }
+    </main>
+  </div>
+</div>

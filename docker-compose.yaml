@@ -1,0 +1,269 @@
+# ==============================================================================
+# ETP TRADING PLATFORM  -  one EC2 box (t3.xlarge, 30 GB), Docker Compose.
+#
+#   cp .env.example .env          # set PUBLIC_HOST (EC2 public IP/DNS) + the secrets
+#   docker compose up -d --build
+#   docker compose ps             # wait until everything is healthy
+#
+# Browser URLs (PUBLIC_HOST = the EC2 address):
+#   UI :4200   Auth API :3000   Order API :8081      (open these 3 ports in the Security Group)
+#   Executor :8082 / Postgres :5432 / Kafka :9092 are NOT exposed to the internet:
+#   Postgres and Kafka are published on 127.0.0.1 only; the executor has no web page.
+#
+# WHERE TO CHANGE THINGS (full list: DEPLOY-GUIDE.html)
+#   address of the box ........ .env  PUBLIC_HOST / PUBLIC_SCHEME  (URLs + CORS follow)
+#   one URL on its own ........ .env  FRONTEND_PUBLIC_URL / AUTH_PUBLIC_URL / ORDER_PUBLIC_URL
+#   ports ..................... .env  FRONTEND_PORT, AUTH_SERVICE_PORT, ORDER_SERVICE_PORT, EXECUTOR_SERVICE_PORT
+#   secrets / keys ............ .env  (DB_PASSWORD, JWT_SECRET, FAUXNANCE_API_KEY, ...)
+#   local Postgres or RDS ..... .env  COMPOSE_PROFILES (localdb) / DB_HOST / JDBC_EXTRA / PGSSLMODE
+#   ETL (optional) ............ .env  COMPOSE_PROFILES=localdb,etl
+#   build flags per service ... the `build.args` below (Node/Java version, start command, ...)
+#   a different project ....... rename the services/paths below; the Dockerfiles need no edits
+#
+# Needs Docker Compose v2.20+ and BuildKit (default in current Docker).
+# ==============================================================================
+
+name: etp
+
+x-logging: &logging              # keeps the 30 GB disk from filling with logs
+  driver: json-file
+  options: { max-size: "10m", max-file: "3" }
+
+x-restart: &restart
+  restart: unless-stopped
+  logging: *logging
+
+# Every container reads .env (env_file); the keys below are set on top of it and win.
+x-common-env: &common-env
+  SHARED_CONFIG: /config/application.yml
+  DB_HOST: ${DB_HOST:-postgres}
+  DB_PORT: ${DB_PORT:-5432}
+  DB_NAME: ${DB_NAME:?set DB_NAME in .env}
+  DB_USER: ${DB_USER:?set DB_USER in .env}
+  DB_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+  PG_SCHEMA: ${PG_SCHEMA:-trading}
+
+x-java-env: &java-env
+  <<: *common-env
+  KAFKA_BOOTSTRAP_SERVERS: ${KAFKA_BOOTSTRAP_SERVERS:-kafka:29092}
+  # Full JDBC URL so TLS (RDS) can be switched on from .env with JDBC_EXTRA.
+  SPRING_DATASOURCE_URL: "jdbc:postgresql://${DB_HOST:-postgres}:${DB_PORT:-5432}/${DB_NAME}?currentSchema=${PG_SCHEMA:-trading}${JDBC_EXTRA:-}"
+
+x-config-volume: &config-volume ./Config/application.yml:/config/application.yml:ro
+
+x-wait-db: &wait-db
+  postgres:
+    condition: service_healthy
+    required: false            # false = the bundled DB is not used (RDS): don't wait for it
+
+services:
+  # ---------------------------------------------------------------- database
+  postgres:
+    profiles: [localdb]
+    image: postgres:16-alpine
+    <<: *restart
+    environment:
+      POSTGRES_DB: ${DB_NAME:?set DB_NAME in .env}
+      POSTGRES_USER: ${DB_USER:?set DB_USER in .env}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      # Run once, on an empty data volume (alphabetical). `docker compose down -v` starts over.
+      - ./Databases/PostgreSQL/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+      - ./Databases/PostgreSQL/seed_data.sql:/docker-entrypoint-initdb.d/02-seed_data.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # ------------------------------------------------------------------- kafka
+  # Single-node KRaft broker. Containers use kafka:29092.
+  kafka:
+    image: apache/kafka:3.8.0
+    <<: *restart
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:29093
+      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:29092,EXTERNAL://${KAFKA_ADVERTISED_HOST:-${PUBLIC_HOST:-localhost}}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS: 0
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"   # topics are created by kafka-init
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+      KAFKA_HEAP_OPTS: "-Xms256m -Xmx768m"
+    ports:
+      - "127.0.0.1:9092:9092"
+    volumes:
+      - kafkadata:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server kafka:29092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+      start_period: 20s
+
+  
+  kafka-init:
+    image: apache/kafka:3.8.0
+    depends_on:
+      kafka: { condition: service_healthy }
+    entrypoint:
+      - bash
+      - -c
+      - |
+        set -eu
+        BS=kafka:29092
+        export PATH=/opt/kafka/bin:$$PATH
+        until kafka-topics.sh --bootstrap-server $$BS --list >/dev/null 2>&1; do echo "waiting for Kafka"; sleep 5; done
+        # name partitions retention.ms   (same as Infrastructure/Kafka/scripts/create-topics.sh)
+        for t in "orders 3 604800000" "trade-events 3 2592000000" "market-data 6 86400000" \
+                 "orders.DLT 3 604800000" "trade-events.DLT 3 2592000000" "market-data.DLT 6 86400000"; do
+          set -- $$t
+          kafka-topics.sh --bootstrap-server $$BS --create --if-not-exists --topic $$1 \
+            --partitions $$2 --replication-factor 1 --config retention.ms=$$3 --config cleanup.policy=delete
+        done
+        kafka-topics.sh --bootstrap-server $$BS --list
+    restart: "no"
+    logging: *logging
+
+  # -------------------------------------------------------------- auth (Node)
+  auth-service:
+    build:
+      context: ./Services/auth-service
+      dockerfile: Dockerfile
+      args:                       # see the header of Services/auth-service/Dockerfile
+        NODE_VERSION: "20"
+        NEEDS_BUILD: "true"
+        BUILD_SCRIPT: build
+        START_CMD: "node dist/main.js"
+        APP_PORT: ${AUTH_SERVICE_PORT:-3000}
+    <<: *restart
+    env_file: .env
+    environment:
+      <<: *common-env
+      # The browser origin(s) allowed to call the API with cookies (never * with credentials).
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-${FRONTEND_PUBLIC_URL:-${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-4200}}}
+      FRONTEND_URL: ${FRONTEND_PUBLIC_URL:-${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-4200}}
+      AUTH_SERVICE_URL: ${AUTH_PUBLIC_URL:-${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:-localhost}:${AUTH_SERVICE_PORT:-3000}}
+      AUTH_SERVICE_PORT: ${AUTH_SERVICE_PORT:-3000}
+    volumes:
+      - *config-volume
+    ports:
+      - "${AUTH_SERVICE_PORT:-3000}:${AUTH_SERVICE_PORT:-3000}"
+    depends_on: *wait-db
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:$${AUTH_SERVICE_PORT}/docs/json || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 30s
+
+  # -------------------------------------------------------- order (Spring Boot)
+  order-service:
+    build:
+      context: ./Services/order-service
+      dockerfile: Dockerfile
+      args:                       # see the header of Services/order-service/Dockerfile
+        JAVA_VERSION: "21"
+        APP_PORT: ${ORDER_SERVICE_PORT:-8081}
+    <<: *restart
+    env_file: .env
+    environment:
+      <<: *java-env
+      SERVER_PORT: ${ORDER_SERVICE_PORT:-8081}     # beats server.port in application.yml
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-${FRONTEND_PUBLIC_URL:-${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:-localhost}:${FRONTEND_PORT:-4200}}}
+      STRATEGY_TRADE_API_URL: http://127.0.0.1:${ORDER_SERVICE_PORT:-8081}
+      JAVA_OPTS: "-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError"
+    volumes:
+      - *config-volume
+    ports:
+      - "${ORDER_SERVICE_PORT:-8081}:${ORDER_SERVICE_PORT:-8081}"
+    depends_on:
+      <<: *wait-db
+      kafka-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO /dev/null http://127.0.0.1:$${SERVER_PORT}/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ------------------------------------------------------ executor (Spring Boot)
+  # No HTTP endpoint is relied on: health = "the port is open".
+  executor-service:
+    build:
+      context: ./Services/executor-service
+      dockerfile: Dockerfile
+      args:
+        JAVA_VERSION: "21"
+        APP_PORT: ${EXECUTOR_SERVICE_PORT:-8082}
+    <<: *restart
+    env_file: .env
+    environment:
+      <<: *java-env
+      SERVER_PORT: ${EXECUTOR_SERVICE_PORT:-8082}
+      JAVA_OPTS: "-XX:MaxRAMPercentage=60 -XX:+ExitOnOutOfMemoryError"
+    volumes:
+      - *config-volume
+    # Not published: nothing outside the box needs it. Add "8082:8082" here to reach it.
+    depends_on:
+      <<: *wait-db
+      kafka-init: { condition: service_completed_successfully }
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 $${SERVER_PORT} || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+
+  # ---------------------------------------------------- ETL (optional, Python)
+  etl:
+    profiles: [etl]
+    build:
+      context: ./ETL Layer
+      dockerfile: Dockerfile
+      args:
+        PYTHON_VERSION: "3.12"
+        START_CMD: "python main.py"
+        WRITABLE_DIRS: /data
+    <<: *restart
+    env_file: .env
+    environment:
+      <<: *common-env
+      DUCKDB_PATH: /data/analytics.duckdb
+    volumes:
+      - *config-volume
+      - duckdb:/data
+    depends_on: *wait-db
+
+  # ------------------------------------------------------------- frontend
+  # One image for every environment. The two addresses below are put into the page
+  # when the container STARTS (no rebuild to change them).
+  frontend:
+    build:
+      context: ./Frontend
+      dockerfile: Dockerfile
+      args:                       # see the header of Frontend/Dockerfile
+        NODE_VERSION: "22"
+        BUILD_SCRIPT: build
+        PLACEHOLDER_ENV: "AUTH_SERVICE_URL=http://auth-url.placeholder.invalid ORDER_SERVICE_URL=http://order-url.placeholder.invalid"
+    <<: *restart
+    environment:
+      AUTH_SERVICE_URL: ${AUTH_PUBLIC_URL:-${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:-localhost}:${AUTH_SERVICE_PORT:-3000}}
+      ORDER_SERVICE_URL: ${ORDER_PUBLIC_URL:-${PUBLIC_SCHEME:-http}://${PUBLIC_HOST:-localhost}:${ORDER_SERVICE_PORT:-8081}}
+    ports:
+      - "${FRONTEND_PORT:-4200}:80"
+
+volumes:
+  pgdata:
+  kafkadata:
+  duckdb:

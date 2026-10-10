@@ -1,0 +1,318 @@
+openapi: 3.1.0
+
+info:
+  title: Customer preferences API
+  version: 1.0.0
+  summary: The single owner of a customer's default account, alert channel and display currency.
+  description: |
+    Contract for the Customer preferences and personalisation extension, built in Sprint 10 as the
+    first of the four mandatory modules. Written before `PreferencesController`, as the brief
+    requires. Served by the Trade REST API on 8081, a module beside the order and account routes.
+
+    ## Why this module exists
+
+    Every customer-facing feature needs to know something about the customer beyond their trades:
+    which channel to reach them on, which account to open on when they sign in, which currency to
+    show a total in. Nothing owned any of that, so each feature invented its own copy. This module
+    is the single place that owns it.
+
+    ## What is deliberately not a route
+
+    The notification module needs the customer's alert channel on every send. That lookup is a Java
+    interface — `com.trading.tradeapi.preferences.api.AlertChannelResolver` — and it is **not**
+    published as HTTP. A resolution route under `/api/v1/` would be reachable by anyone holding any
+    customer's token, and it would exist only so another module in the same process could call it.
+    Keeping it off the wire is what makes the "every route compares `accountId` against the account
+    it addresses" rule hold without an exception.
+
+    ## The default that is not used
+
+    `trading.account.user_id` is UNIQUE today, so one user has exactly one account and
+    `defaultAccountId` currently resolves to the caller's own account. It is stored anyway. The
+    field is what turns "which account opens at sign-in" from a hard-coded guess into a preference,
+    and it stays valid the day the unique constraint is lifted.
+
+    ## When nothing has been stored
+
+    `GET` on an account with no preference row answers `200` with `alertChannel: "NONE"` and every
+    optional field `null`, rather than `404`. Absence of a row is not an error condition; it is an
+    unset preference, and the caller must be able to tell the difference between "this customer
+    chose no channel" and "this request failed". What a caller does with `NONE` is decided by the
+    caller and recorded in the decision log — this module answers, it does not choose.
+
+servers:
+  - url: http://localhost:8081
+    description: Local development.
+  - url: http://trade-api:8081
+    description: Service name inside the Docker Compose network.
+
+tags:
+  - name: Preferences
+    description: Read and write the calling customer's own preferences.
+
+security:
+  - bearerAuth: []
+
+paths:
+
+  /api/v1/preferences/{accountId}:
+    get:
+      tags: [Preferences]
+      operationId: getPreferences
+      summary: Read the customer's preferences
+      description: |
+        Returns the stored preference for `{accountId}`. If the customer has never set one, the
+        response describes an unset preference rather than failing.
+
+        The token's `accountId` claim must equal `{accountId}`. A mismatch is `403` `ACC-403` and
+        is logged; it is never `404`, because a customer probing another customer's preferences is
+        an access-control failure and not a lookup miss.
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+      responses:
+        '200':
+          description: The stored preference, or an unset one.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferenceResponse'
+              examples:
+                set:
+                  summary: A customer who chose email
+                  value:
+                    accountId: 101
+                    defaultAccountId: 101
+                    alertChannel: EMAIL
+                    alertContact: alex@example.com
+                    displayCurrency: USD
+                    updatedAt: '2026-10-19T14:05:11Z'
+                unset:
+                  summary: Never configured
+                  value:
+                    accountId: 101
+                    defaultAccountId: null
+                    alertChannel: NONE
+                    alertContact: null
+                    displayCurrency: null
+                    updatedAt: null
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+
+    put:
+      tags: [Preferences]
+      operationId: putPreferences
+      summary: Create or replace the customer's preferences
+      description: |
+        Whole-record replace: the body is the new preference, not a patch of the old one. A second
+        `PUT` for the same account replaces the first, and `updatedAt` moves.
+
+        `defaultAccountId` must resolve to an account owned by the same user as `{accountId}`.
+        Anything else is `403` `ACC-403` and is logged, because a body that names another
+        customer's account is the same probe as a path that does.
+      parameters:
+        - $ref: '#/components/parameters/AccountIdPath'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PreferenceRequest'
+            examples:
+              email:
+                summary: Email channel with a display currency
+                value:
+                  defaultAccountId: 101
+                  alertChannel: EMAIL
+                  alertContact: alex@example.com
+                  displayCurrency: USD
+              none:
+                summary: Explicitly opt out of notifications
+                value:
+                  defaultAccountId: 101
+                  alertChannel: NONE
+                  alertContact: null
+                  displayCurrency: null
+      responses:
+        '200':
+          description: The stored preference.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreferenceResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AccountNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        The access token the Trade REST API already verifies on every route under `/api/v1/`:
+        signature, algorithm, expiry and issuer, before the handler runs. This module writes no
+        second verifier. What verification cannot decide — whether this caller may touch this
+        preference — is decided on every route by comparing the `accountId` claim to the path.
+
+  parameters:
+    AccountIdPath:
+      name: accountId
+      in: path
+      required: true
+      description: The numeric account key, `trading.account.account_id`. Must match the token's `accountId` claim.
+      schema:
+        type: integer
+        format: int64
+        minimum: 1
+      example: 101
+
+  responses:
+    Unauthorised:
+      description: Missing, malformed, expired or wrongly signed token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorised:
+              value:
+                errorCode: AUTH-401
+                message: Unauthorised
+    Forbidden:
+      description: |
+        The token is valid but its `accountId` claim does not match `{accountId}`, or the body
+        named an account this customer does not own. Returned, not `404`, and logged.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              value:
+                errorCode: ACC-403
+                message: This account is not the one this session may access
+    AccountNotFound:
+      description: No account exists with that key, so it cannot hold a preference.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                errorCode: ACC-404
+                message: Account not found
+    InvalidInput:
+      description: |
+        Field validation failed. Typical cases: `alertContact` absent while `alertChannel` is a
+        channel that needs one; a contact that is not an email address on `EMAIL` or `BOTH`; `displayCurrency` shorter or longer than three
+        characters.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalid:
+              value:
+                errorCode: VAL-422
+                message: alertContact is required when alertChannel is EMAIL
+
+  schemas:
+
+    PreferenceResponse:
+      type: object
+      additionalProperties: false
+      required: [accountId, defaultAccountId, alertChannel, alertContact, displayCurrency]
+      properties:
+        accountId:
+          type: integer
+          format: int64
+        defaultAccountId:
+          type: [integer, 'null']
+          format: int64
+          description: |
+            The account the Angular application opens on after sign-in. Null when unset. Must be
+            an account owned by the same user as `accountId`.
+        alertChannel:
+          $ref: '#/components/schemas/AlertChannel'
+        alertContact:
+          type: [string, 'null']
+          maxLength: 255
+          description: |
+            The destination for that channel — an email address on `EMAIL` and `BOTH`. Null on
+            `PUSH`, `NONE` and when unset.
+        displayCurrency:
+          type: [string, 'null']
+          minLength: 3
+          maxLength: 3
+          description: ISO 4217 code totals are rendered in. Null when the account's own currency is used.
+        updatedAt:
+          type: [string, 'null']
+          format: date-time
+          description: When the record was last written. Null when the customer has never set one.
+
+    PreferenceRequest:
+      type: object
+      additionalProperties: false
+      required: [alertChannel]
+      properties:
+        defaultAccountId:
+          type: [integer, 'null']
+          format: int64
+          minimum: 1
+        alertChannel:
+          $ref: '#/components/schemas/AlertChannel'
+        alertContact:
+          type: [string, 'null']
+          maxLength: 255
+          description: Required and validated against the shape of `alertChannel` unless the channel is `NONE`.
+        displayCurrency:
+          type: [string, 'null']
+          minLength: 3
+          maxLength: 3
+
+    AlertChannel:
+      type: string
+      enum: [EMAIL, PUSH, BOTH, NONE]
+      description: |
+        | Channel | Needs a contact | Contact shape |
+        |---|---|---|
+        | `EMAIL` | yes | RFC-ish address, validated on the server |
+        | `PUSH` | no | in-app; any contact sent is dropped |
+        | `BOTH` | yes | an email address (email and in-app) |
+        | `NONE` | no | must be `null` |
+
+        `NONE` is a stored answer, not an absence. It is what an alert path resolves to when a
+        customer has decided not to be told, and it is distinct from a customer who never answered.
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      properties:
+        errorCode:
+          type: string
+          enum: [AUTH-401, ACC-403, ACC-404, VAL-422]
+          description: |
+            | Code | HTTP | Meaning |
+            |---|---|---|
+            | `AUTH-401` | 401 | Unauthorised or invalid token |
+            | `ACC-403` | 403 | Account not accessible with this token |
+            | `ACC-404` | 404 | Account not found |
+            | `VAL-422` | 422 | Invalid input |
+
+            All four are platform codes, used unchanged. This module extends no catalogue of its
+            own: it has no failure that the platform does not already name.
+        message:
+          type: string

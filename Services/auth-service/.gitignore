@@ -1,0 +1,32 @@
+# Secrets and local configuration
+.env
+.env.local
+*.local.env
+
+# Node, TypeScript and NestJS
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+npm-debug.log*
+yarn-error.log*
+coverage/
+
+# Log files
+*.log
+*.err.log
+*.out.log
+
+# IDEs and editors
+.idea/
+*.iml
+.vscode/
+*.swp
+
+# Operating system
+.DS_Store
+Thumbs.db
+
+# Build artifacts
+.nest/
+test-results/

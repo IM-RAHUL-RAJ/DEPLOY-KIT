@@ -1,0 +1,1414 @@
+/* ============================================================================
+   Akatsuki Terminal - Global Design System
+
+   The Akatsuki cloak: a red field broken by yellow cloud scrollwork, over
+   near-black lacquer. Red is the brand, yellow is used sparingly as the second
+   voice, and the two are never both loud in the same place.
+
+   Market direction deliberately does NOT follow the brand. A trader reads a
+   green gain and a red loss without thinking, so --positive stays green and
+   --negative stays red even though the brand itself is red. If the brand were
+   allowed to recolour the direction of a move, a rising position and the brand
+   would look identical. --brand-red is the Akatsuki crimson and is used for
+   chrome and emphasis, never for market direction.
+   ========================================================================== */
+
+:root,
+[data-theme='dark'] {
+  /* Surfaces: ink black, only just warmed by the red. Cards sit one step up. */
+  --bg-primary: #050304;
+  --bg-secondary: #0a0506;
+  --bg-card: rgba(15, 8, 10, 0.88);
+  --bg-card-hover: rgba(24, 10, 13, 0.95);
+  --bg-input: rgba(5, 3, 4, 0.96);
+  --bg-elevated: #120809;
+  --bg-panel-alt: rgba(122, 10, 22, 0.12);
+
+  /* Strokes: dark red, never grey */
+  --border-color: rgba(190, 30, 50, 0.16);
+  --border-hover: rgba(225, 38, 61, 0.55);
+  --border-strong: rgba(190, 30, 50, 0.3);
+
+  /* Brand: shades of Akatsuki red, from oxblood to vermilion */
+  --accent: #e1263d;
+  --accent-hot: #ff3d52;
+  --accent-deep: #7a0a16;
+  --accent-soft: rgba(225, 38, 61, 0.12);
+  --accent-dim: rgba(225, 38, 61, 0.14);
+  --accent-glow: 0 0 26px rgba(225, 38, 61, 0.38);
+  --accent-ink: #fff4f5;
+
+  /* Yellow: the accent. Totals, highlights and the cloud's outline only. */
+  --accent-yellow: #ffc93c;
+  --accent-yellow-soft: rgba(255, 201, 60, 0.12);
+
+  --gradient-brand: linear-gradient(125deg, #7a0a16 0%, #c4142c 45%, #e1263d 75%, #ff4b3a 100%);
+  --gradient-accent: linear-gradient(125deg, #e1263d 0%, #ff6a2b 60%, #ffc93c 100%);
+  --gradient-panel: linear-gradient(160deg, rgba(225, 38, 61, 0.08), rgba(255, 201, 60, 0.025) 65%, transparent);
+  --radial-ambient: radial-gradient(circle at 12% -12%, rgba(196, 20, 44, 0.16) 0%, transparent 42%),
+    radial-gradient(circle at 95% 4%, rgba(255, 201, 60, 0.05) 0%, transparent 38%);
+  --card-glow: radial-gradient(circle at 30% 0%, rgba(225, 38, 61, 0.1) 0%, transparent 62%);
+
+  /* Ink */
+  --text-primary: #f5eeeb;
+  --text-secondary: #a39894;
+  --text-muted: #6a605d;
+  --danger-ink: #f4e3dc;
+
+  /* Market direction. Gains are vermilion, losses deep crimson: both red, never
+     pink, separated by warmth and lightness so they read at a glance. */
+  --positive: #ff5a3c;
+  --negative: #d4142e;
+  --warning: #ffc93c;
+  --neutral: #a39894;
+
+  --overlay: rgba(5, 3, 4, 0.72);
+  --panel-tint: rgba(225, 38, 61, 0.045);
+  --surface-tint-weak: rgba(225, 38, 61, 0.035);
+  --surface-tint: rgba(225, 38, 61, 0.065);
+  --surface-tint-strong: rgba(225, 38, 61, 0.15);
+  --divider: rgba(190, 30, 50, 0.1);
+
+  /* Order status */
+  --status-new: #ffc93c;
+  --status-filled: #3ddc84;
+  --status-rejected: #d4142e;
+  --status-cancelled: #a39894;
+  --live-accent: #40d97a;
+  --live-surface: rgba(64, 217, 122, 0.12);
+  --live-border: rgba(64, 217, 122, 0.34);
+  --live-glow: rgba(64, 217, 122, 0.5);
+  --watchlist-card-outline: rgba(225, 38, 61, 0.14);
+  --watchlist-card-shadow: rgba(0, 0, 0, 0.22);
+  --watchlist-card-hover-outline: rgba(225, 38, 61, 0.4);
+  --watchlist-card-hover-shadow: rgba(0, 0, 0, 0.28);
+  --watchlist-card-glow: rgba(225, 38, 61, 0.2);
+
+  --radius: 16px;
+  --radius-sm: 10px;
+  --radius-lg: 22px;
+
+  --shadow: 0 16px 44px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 32px 90px rgba(0, 0, 0, 0.75);
+
+  --font-sans: 'Inter', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+[data-theme='light'] {
+  --bg-primary: #f8f4f4;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --bg-card-hover: #fdf6f6;
+  --bg-input: #ffffff;
+  --bg-elevated: #ffffff;
+  --bg-panel-alt: rgba(179, 18, 42, 0.05);
+
+  --border-color: #eedfe1;
+  --border-hover: #b3122a;
+  --border-strong: #dfc8cb;
+
+  --accent: #b3122a;
+  --accent-hot: #d31f38;
+  --accent-deep: #6e0814;
+  --accent-soft: rgba(179, 18, 42, 0.08);
+  --accent-dim: rgba(179, 18, 42, 0.08);
+  --accent-glow: 0 6px 18px rgba(179, 18, 42, 0.22);
+  --accent-ink: #fff4f5;
+
+  --accent-yellow: #9a6d00;
+  --accent-yellow-soft: rgba(201, 145, 0, 0.12);
+
+  --gradient-brand: linear-gradient(125deg, #6e0814 0%, #9e1024 45%, #b3122a 75%, #d8392c 100%);
+  --gradient-accent: linear-gradient(125deg, #b3122a 0%, #d8492c 60%, #c99100 100%);
+  --gradient-panel: linear-gradient(160deg, rgba(179, 18, 42, 0.05), transparent 60%);
+  --radial-ambient: radial-gradient(circle at 18% -10%, rgba(179, 18, 42, 0.06) 0%, transparent 42%),
+    radial-gradient(circle at 92% 0%, rgba(201, 145, 0, 0.05) 0%, transparent 40%);
+  --card-glow: none;
+
+  --text-primary: #1b0f11;
+  --text-secondary: #5c474b;
+  --text-muted: #8a7479;
+  --danger-ink: #991b1b;
+
+  --positive: #b4231c;
+  --negative: #8c0f1c;
+  --warning: #9a6d00;
+  --neutral: #8a7479;
+
+  --overlay: rgba(248, 244, 244, 0.85);
+  --panel-tint: rgba(27, 15, 17, 0.025);
+  --surface-tint-weak: rgba(27, 15, 17, 0.025);
+  --surface-tint: rgba(27, 15, 17, 0.05);
+  --surface-tint-strong: rgba(27, 15, 17, 0.1);
+  --divider: rgba(27, 15, 17, 0.08);
+
+  --status-new: #9a6d00;
+  --status-filled: #15803d;
+  --status-rejected: #8c0f1c;
+  --status-cancelled: #8a7479;
+  --live-accent: #177a43;
+  --live-surface: rgba(23, 122, 67, 0.1);
+  --live-border: rgba(23, 122, 67, 0.26);
+  --live-glow: rgba(23, 122, 67, 0.24);
+  --watchlist-card-outline: rgba(27, 15, 17, 0.08);
+  --watchlist-card-shadow: rgba(27, 15, 17, 0.08);
+  --watchlist-card-hover-outline: rgba(179, 18, 42, 0.24);
+  --watchlist-card-hover-shadow: rgba(27, 15, 17, 0.12);
+  --watchlist-card-glow: rgba(179, 18, 42, 0.14);
+
+  /* Two layers: a crisp contact shadow and a soft ambient one, so white cards lift
+     off the warm page instead of sitting flat on it. */
+  --shadow: 0 1px 2px rgba(27, 15, 17, 0.05), 0 10px 28px rgba(27, 15, 17, 0.07);
+  --shadow-lg: 0 2px 6px rgba(27, 15, 17, 0.06), 0 24px 56px rgba(27, 15, 17, 0.16);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+  background-color: var(--bg-primary);
+  background-image: var(--radial-ambient);
+  background-attachment: fixed;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color 0.3s, color 0.3s;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+
+  &:hover {
+    text-decoration: none;
+    opacity: 0.9;
+  }
+}
+
+/* -- Route transitions -----------------------------------------------------
+   The router drives the browser's View Transition API, so these pseudo-elements
+   are the animation. Only the root snapshot cross-fades: without a name the
+   whole page is one snapshot pair, which is what keeps a route change cheap.
+   The old page leaves faster than the new one arrives so the transition reads as
+   forward motion rather than a flicker, and a short red wash sells the swap as a
+   deliberate page turn in the Akatsuki palette rather than a page load.
+   Browsers without support never see these rules and simply swap. */
+::view-transition-old(root) {
+  animation: akatsuki-leave 180ms cubic-bezier(0.4, 0, 1, 1) both;
+}
+
+::view-transition-new(root) {
+  animation: akatsuki-enter 260ms cubic-bezier(0, 0, 0.2, 1) both;
+}
+
+@keyframes akatsuki-leave {
+  to {
+    opacity: 0;
+    transform: translateX(-14px) scale(0.99);
+  }
+}
+
+@keyframes akatsuki-enter {
+  from {
+    opacity: 0;
+    transform: translateX(14px) scale(0.99);
+    clip-path: inset(0 0 0 0);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Reduced motion: the swap still happens, it just does not animate. A user who
+   has asked the OS for less movement gets an instant cut instead. */
+@media (prefers-reduced-motion: reduce) {
+
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+  }
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: content-box;
+
+  &:hover {
+    background: var(--border-hover);
+    background-clip: content-box;
+  }
+}
+
+/* -- Cards ---------------------------------------------------------------- */
+.card {
+  position: relative;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  transition: background 0.3s, border-color 0.2s, box-shadow 0.25s, transform 0.2s;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: 0 0 auto 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.12), transparent);
+    opacity: 0.7;
+    pointer-events: none;
+  }
+}
+
+.card-hover:hover {
+  border-color: var(--border-hover);
+  background: var(--bg-card-hover);
+  transform: translateY(-2px);
+}
+
+.panel-title {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* -- Buttons -------------------------------------------------------------- */
+.btn-accent {
+  background: var(--gradient-brand);
+  color: #fff5f6;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: -0.01em;
+  border: none;
+  border-radius: var(--radius-sm);
+  padding: 11px 22px;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: box-shadow 0.2s, transform 0.15s, filter 0.2s;
+  box-shadow: 0 6px 20px rgba(225, 45, 62, 0.28);
+
+  &:hover {
+    box-shadow: var(--accent-glow);
+    transform: translateY(-1.5px);
+    filter: brightness(1.05);
+  }
+
+  &:active {
+    transform: translateY(0);
+  }
+
+  &:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+    transform: none;
+    box-shadow: none;
+    filter: grayscale(0.3);
+  }
+}
+
+.btn-ghost {
+  background: var(--surface-tint);
+  color: var(--text-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  padding: 10px 18px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: border-color 0.2s, color 0.2s, background 0.2s, box-shadow 0.2s;
+
+  &:hover {
+    border-color: var(--border-hover);
+    color: var(--text-primary);
+    background: var(--accent-dim);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.icon-btn {
+  width: 38px;
+  height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-tint);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.18s;
+
+  &:hover {
+    color: var(--accent);
+    border-color: var(--border-hover);
+    background: var(--accent-dim);
+  }
+}
+
+/* -- Forms ---------------------------------------------------------------- */
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--text-secondary);
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+  }
+
+  input,
+  select,
+  textarea {
+    background: var(--bg-input);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    color: var(--text-primary);
+    font-family: var(--font-sans);
+    font-size: 14px;
+    padding: 11px 15px;
+    outline: none;
+    width: 100%;
+    transition: border-color 0.2s, background 0.2s, color 0.2s, box-shadow 0.2s;
+
+    &:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(225, 45, 62, 0.16);
+    }
+
+    &::placeholder {
+      color: var(--text-muted);
+    }
+
+    &:read-only,
+    &[readonly] {
+      opacity: 0.65;
+      cursor: not-allowed;
+    }
+
+    &.ng-invalid.ng-touched {
+      border-color: var(--negative);
+    }
+  }
+
+  .field-error {
+    font-size: 11px;
+    color: var(--negative);
+  }
+
+  .field-hint {
+    font-size: 11px;
+    color: var(--text-muted);
+  }
+}
+
+/* Segmented control (BUY / SELL). Direction keeps conventional colours. */
+.segmented {
+  display: grid;
+  grid-auto-flow: column;
+  gap: 4px;
+  padding: 4px;
+  background: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+}
+
+.segmented button {
+  border: none;
+  background: transparent;
+  color: var(--text-secondary);
+  font-weight: 700;
+  font-size: 13px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &.buy.active {
+    background: rgba(255, 90, 60, 0.14);
+    color: var(--positive);
+    box-shadow: inset 0 0 0 1px rgba(255, 90, 60, 0.4);
+  }
+
+  &.sell.active {
+    background: rgba(224, 30, 55, 0.16);
+    color: var(--negative);
+    box-shadow: inset 0 0 0 1px rgba(224, 30, 55, 0.4);
+  }
+
+  &:hover {
+    color: var(--text-primary);
+  }
+}
+
+/* -- Chips / pills -------------------------------------------------------- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+  background: var(--surface-tint);
+  border: 1px solid var(--border-color);
+  border-radius: 999px;
+  padding: 5px 12px;
+}
+
+/* -- Status badges -------------------------------------------------------- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  border-radius: 7px;
+  padding: 4px 10px;
+  min-width: 106px;
+  white-space: nowrap;
+
+  &::before {
+    content: '';
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: currentColor;
+    box-shadow: 0 0 8px currentColor;
+  }
+
+  &.badge-new {
+    background: rgba(245, 197, 66, 0.12);
+    color: var(--status-new);
+    border: 1px solid rgba(245, 197, 66, 0.32);
+  }
+
+  &.badge-filled {
+    background: rgba(61, 220, 132, 0.12);
+    color: var(--status-filled);
+    border: 1px solid rgba(61, 220, 132, 0.34);
+  }
+
+  &.badge-rejected {
+    background: rgba(224, 30, 55, 0.12);
+    color: var(--status-rejected);
+    border: 1px solid rgba(224, 30, 55, 0.32);
+  }
+
+  &.badge-cancelled {
+    background: rgba(168, 150, 154, 0.12);
+    color: var(--status-cancelled);
+    border: 1px solid rgba(168, 150, 154, 0.3);
+  }
+}
+
+/* -- Banners -------------------------------------------------------------- */
+.error-banner {
+  background: rgba(248, 113, 113, 0.1);
+  border: 1px solid rgba(248, 113, 113, 0.34);
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+  color: var(--danger-ink);
+  font-size: 13px;
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+
+  .icon {
+    flex-shrink: 0;
+    font-size: 16px;
+    font-weight: 800;
+  }
+}
+
+.success-banner {
+  background: var(--accent-soft);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-sm);
+  padding: 13px 16px;
+  color: var(--accent);
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  .icon {
+    flex-shrink: 0;
+    font-size: 16px;
+  }
+}
+
+.alt-action {
+  font-size: 13px;
+  color: var(--text-secondary);
+  text-align: center;
+
+  a {
+    color: var(--accent);
+    font-weight: 600;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
+}
+
+/* -- Loading -------------------------------------------------------------- */
+.spinner {
+  display: inline-block;
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--accent);
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.skeleton {
+  background: linear-gradient(90deg, rgba(190, 30, 50, 0.08) 25%, rgba(190, 30, 50, 0.16) 37%, rgba(190, 30, 50, 0.08) 63%);
+  background-size: 400% 100%;
+  animation: shimmer 1.4s ease infinite;
+  border-radius: 8px;
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 100% 0;
+  }
+
+  100% {
+    background-position: 0 0;
+  }
+}
+
+/* -- Data tables ---------------------------------------------------------- */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+
+  thead th {
+    text-align: left;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+    padding: 12px 16px;
+    border-bottom: 1px solid var(--border-color);
+    white-space: nowrap;
+    position: sticky;
+    top: 0;
+    background: var(--bg-secondary);
+
+    &.right {
+      text-align: right;
+    }
+  }
+
+  tbody td {
+    padding: 14px 16px;
+    font-size: 13px;
+    border-bottom: 1px solid var(--divider);
+
+    &.right {
+      text-align: right;
+    }
+  }
+
+  tbody tr {
+    transition: background 0.15s;
+  }
+
+  tbody tr:hover {
+    background: var(--surface-tint-weak);
+  }
+}
+
+/* -- Utilities ------------------------------------------------------------ */
+.positive {
+  color: var(--positive);
+}
+
+.negative {
+  color: var(--negative);
+}
+
+.warning {
+  color: var(--warning);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.text-muted {
+  color: var(--text-muted);
+}
+
+.text-secondary {
+  color: var(--text-secondary);
+}
+
+.text-bold {
+  font-weight: 700;
+}
+
+.right {
+  text-align: right;
+}
+
+.gradient-text {
+  background: var(--gradient-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+}
+
+.page-wrap {
+  padding: 28px 32px;
+  max-width: 1500px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.page-title {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.page-subtitle {
+  font-size: 13px;
+  color: var(--text-secondary);
+  margin-top: 4px;
+}
+
+.divider {
+  height: 1px;
+  background: var(--border-color);
+  border: none;
+}
+
+/* icon sizing for inline svg */
+svg.i {
+  width: 18px;
+  height: 18px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+svg.i-sm {
+  width: 15px;
+  height: 15px;
+}
+
+svg.i-lg {
+  width: 22px;
+  height: 22px;
+}
+
+/* ── Hover / focus explanation tile ───────────────────────────────────────
+   <div class="has-tip" tabindex="0" aria-describedby="x"> … <span class="tip" id="x" role="tooltip">…</span></div>
+   Shown on hover and on keyboard focus, so it is not mouse-only. */
+.has-tip {
+  position: relative;
+  cursor: help;
+
+  &:focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+  }
+
+  >.tip {
+    position: absolute;
+    left: 50%;
+    bottom: calc(100% + 8px);
+    z-index: 40;
+    width: max-content;
+    max-width: min(260px, 80vw);
+    padding: 8px 11px;
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    background: var(--bg-elevated);
+    box-shadow: var(--shadow);
+    color: var(--text-primary);
+    font-size: 12px;
+    font-weight: 500;
+    line-height: 1.45;
+    letter-spacing: normal;
+    text-transform: none;
+    text-align: left;
+    white-space: normal;
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+    transform: translate(-50%, 4px);
+    transition: opacity 0.15s, transform 0.15s, visibility 0.15s;
+  }
+
+  &:hover>.tip,
+  &:focus-visible>.tip {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, 0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .has-tip > .tip { transition: none; }
+}
+
+/* -- Confirm dialogs (watchlist / price-alerts / blotter) ------------------
+   <div class="dialog-backdrop" (click)="dismiss()"></div>
+   <div class="dialog" role="alertdialog" …> … </div> */
+.dialog-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: var(--overlay);
+  backdrop-filter: blur(3px);
+}
+
+.dialog {
+  position: fixed;
+  z-index: 61;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: min(440px, calc(100vw - 32px));
+  padding: 22px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  border: 1px solid var(--border-hover);
+  border-radius: 12px;
+  box-shadow: var(--shadow-lg);
+  background: var(--bg-elevated);
+}
+
+.dialog-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.dialog-title {
+  flex: 1;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-primary);
+}
+
+.dialog-close {
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+
+  &:hover {
+    color: var(--text-primary);
+    border-color: var(--border-hover);
+  }
+}
+
+.dialog-detail {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.5;
+  font-size: 14px;
+}
+
+.dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+}
+
+.dialog-actions .btn-danger {
+  background: var(--negative);
+  color: #fff;
+  box-shadow: 0 2px 8px rgba(212, 20, 46, 0.3);
+
+  &:hover:not(:disabled) {
+    filter: brightness(1.08);
+  }
+}
+
+/* -- App toasts (shell notification center) -------------------------------- */
+.nav-badge {
+  position: absolute;
+  top: 6px;
+  right: 8px;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 9px;
+  background: var(--negative);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 26px;
+  /* Clear of the assistant launcher (60px at bottom: 26px) so neither hides the other. */
+  bottom: 104px;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: min(360px, calc(100vw - 40px));
+}
+
+.toast {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 14px 14px 14px 16px;
+  border: 1px solid var(--border-hover);
+  border-left: 3px solid var(--accent-yellow);
+  border-radius: 12px;
+  background: var(--bg-elevated);
+  box-shadow: var(--shadow-lg);
+}
+
+.toast-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+
+.toast-title {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--accent-yellow);
+}
+
+.toast-text {
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-primary);
+  overflow-wrap: anywhere;
+}
+
+.toast-close {
+  display: inline-grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--text-secondary);
+  cursor: pointer;
+
+  &:hover { color: var(--text-primary); border-color: var(--border-hover); }
+}
+
+/* -- Extension pages (watchlist / alerts / inbox / settings / profile / portfolio) --
+   One rhythm for the Sprint 10 screens: a 24px gap between sections, 24px inside a
+   section card, and the shared .page-header / .card / .form-group / .data-table above. */
+.ext-page {
+  padding: 28px 32px 56px;
+  max-width: 1280px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+
+  &.narrow {
+    max-width: 960px;
+  }
+
+  > .page-header {
+    align-items: flex-end;
+  }
+
+  .page-title,
+  .page-subtitle {
+    margin: 0;
+  }
+
+  .page-subtitle {
+    margin-top: 6px;
+  }
+}
+
+.section-card {
+  padding: 24px;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+
+.section-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  flex-wrap: wrap;
+
+  h2 {
+    margin: 0;
+    font-size: 16px;
+    font-weight: 700;
+    letter-spacing: -0.01em;
+    color: var(--text-primary);
+  }
+
+  p {
+    margin: 6px 0 0;
+    max-width: 72ch;
+    font-size: 13px;
+    line-height: 1.55;
+    color: var(--text-secondary);
+  }
+}
+
+.section-note {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+
+  &.warn {
+    color: var(--warning);
+  }
+
+  &.danger {
+    color: var(--negative);
+    font-weight: 600;
+  }
+}
+
+.state-card {
+  padding: 56px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--text-secondary);
+  font-size: 14px;
+
+  svg {
+    width: 40px;
+    height: 40px;
+    margin-bottom: 8px;
+    opacity: 0.55;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.6;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  p {
+    margin: 0;
+    max-width: 52ch;
+    line-height: 1.5;
+  }
+
+  .state-title {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text-primary);
+  }
+
+  &.inline {
+    flex-direction: row;
+    padding: 40px 24px;
+    gap: 12px;
+  }
+}
+
+.table-summary {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 13px;
+  color: var(--text-secondary);
+
+  strong {
+    color: var(--text-primary);
+    font-weight: 700;
+  }
+}
+
+.table-scroll {
+  overflow-x: auto;
+}
+
+.data-table .cell-actions {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.nowrap {
+  white-space: nowrap;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--border-color);
+  background: var(--surface-tint);
+  color: var(--text-secondary);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  white-space: nowrap;
+
+  &.pill-live {
+    color: var(--live-accent);
+    background: var(--live-surface);
+    border-color: var(--live-border);
+  }
+
+  &.pill-warn {
+    color: var(--warning);
+    background: var(--accent-yellow-soft);
+    border-color: rgba(255, 201, 60, 0.32);
+  }
+
+  &.pill-danger {
+    color: var(--negative);
+    background: rgba(224, 30, 55, 0.1);
+    border-color: rgba(224, 30, 55, 0.32);
+  }
+
+  &.pill-accent {
+    color: var(--accent);
+    background: var(--accent-soft);
+    border-color: var(--border-hover);
+  }
+}
+
+.btn-ghost.btn-sm,
+.btn-accent.btn-sm {
+  padding: 6px 12px;
+  font-size: 12px;
+}
+
+.btn-ghost.btn-danger-ghost:hover:not(:disabled) {
+  border-color: var(--negative);
+  color: var(--negative);
+  background: rgba(224, 30, 55, 0.1);
+}
+
+@media (max-width: 720px) {
+  .ext-page {
+    padding: 20px 16px 40px;
+    gap: 20px;
+  }
+
+  .section-card {
+    padding: 18px;
+  }
+}
+
+/* A symbol that opens its chart (ChartSymbolDirective). */
+.chart-symbol {
+  cursor: pointer;
+  border-radius: 4px;
+  transition: color 0.15s, box-shadow 0.15s;
+  text-decoration: underline dotted transparent;
+  text-underline-offset: 3px;
+
+  &:hover {
+    color: var(--accent);
+    text-decoration-color: currentColor;
+  }
+
+  &:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--border-hover);
+  }
+}
+
+
+/* ---- Theme polish, both modes ------------------------------------------- */
+html,
+body {
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+::selection {
+  background: var(--accent-soft);
+  color: var(--text-primary);
+}
+
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+*::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+*::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+
+  &:hover {
+    background: var(--border-hover);
+    background-clip: padding-box;
+  }
+}
+
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+:focus-visible {
+  outline: 2px solid var(--border-hover);
+  outline-offset: 2px;
+}
+
+[data-theme='light'] {
+  .card {
+    border-color: var(--border-color);
+
+    &::before {
+      background: linear-gradient(90deg, transparent, rgba(179, 18, 42, 0.18), transparent);
+    }
+  }
+
+  .card-hover:hover {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+
+/* ==========================================================================
+   Modern layer: the app-wide look shared with the sign-in screens.
+   ========================================================================== */
+:root {
+  --radius: 18px;
+  --radius-sm: 12px;
+  --radius-lg: 24px;
+}
+
+/* A faint, slowly drifting aurora behind every page. The page colour lives on html,
+   so body stays transparent and the aurora shows between the two. */
+body {
+  background-color: transparent;
+  background-image: none;
+}
+
+body::before {
+  content: '';
+  position: fixed;
+  inset: -10%;
+  z-index: -1;
+  pointer-events: none;
+  background:
+    radial-gradient(40% 35% at 15% 10%, rgba(196, 20, 44, 0.14), transparent 70%),
+    radial-gradient(35% 30% at 85% 20%, rgba(255, 106, 43, 0.08), transparent 70%),
+    radial-gradient(45% 40% at 60% 95%, rgba(122, 10, 22, 0.16), transparent 70%);
+  filter: blur(20px);
+  animation: app-aurora 40s ease-in-out infinite alternate;
+}
+
+[data-theme='light'] body::before {
+  background:
+    radial-gradient(40% 35% at 15% 10%, rgba(225, 38, 61, 0.07), transparent 70%),
+    radial-gradient(35% 30% at 85% 20%, rgba(255, 140, 90, 0.08), transparent 70%),
+    radial-gradient(45% 40% at 60% 95%, rgba(255, 201, 60, 0.08), transparent 70%);
+}
+
+@keyframes app-aurora {
+  from { transform: translate(0, 0) scale(1); }
+  to { transform: translate(-3%, 2%) scale(1.06); }
+}
+
+/* Page titles shimmer from the text colour into the brand. */
+.page-title {
+  background: linear-gradient(110deg, var(--text-primary) 35%, var(--accent) 80%, var(--accent-yellow));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  letter-spacing: -0.03em;
+}
+
+/* Primary buttons: a living gradient and a sweep of light on hover. */
+.btn-accent {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(110deg, #8c0f1c, #c4142c 35%, #e1263d 65%, #ff5a3c);
+  background-size: 180% 100%;
+  background-position: 0% 50%;
+  transition: box-shadow 0.25s, transform 0.15s, filter 0.2s, background-position 0.5s ease;
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.25) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.6s ease;
+    pointer-events: none;
+  }
+
+  &:hover:not(:disabled) {
+    background-position: 100% 50%;
+
+    &::after {
+      transform: translateX(120%);
+    }
+  }
+}
+
+/* Secondary buttons: glass. */
+.btn-ghost {
+  border-radius: var(--radius-sm);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+
+  &:hover:not(:disabled) {
+    transform: translateY(-1px);
+  }
+}
+
+/* Inputs: a soft glow on focus. */
+.form-group input:focus,
+.form-group select:focus,
+.form-group textarea:focus {
+  box-shadow: 0 0 0 4px var(--accent-soft) !important;
+}
+
+/* Tables: a solid header, an accent marker on the hovered row. */
+.data-table {
+  thead th {
+    background: var(--bg-elevated);
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+  }
+
+  tbody tr {
+    position: relative;
+  }
+
+  tbody tr:hover {
+    background: var(--surface-tint);
+  }
+
+  tbody tr:hover td:first-child {
+    box-shadow: inset 3px 0 0 var(--accent);
+  }
+}
+
+/* Cards that can be clicked lift a little. */
+.card-hover {
+  transition: transform 0.2s, box-shadow 0.25s, border-color 0.2s;
+
+  &:hover {
+    box-shadow: var(--shadow-lg);
+  }
+}
+
+/* Banners: rounder, with a coloured edge. */
+.error-banner,
+.success-banner {
+  border-radius: var(--radius-sm);
+}
+
+/* Pills: a touch more presence. */
+.pill {
+  padding: 4px 11px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body::before {
+    animation: none;
+  }
+}

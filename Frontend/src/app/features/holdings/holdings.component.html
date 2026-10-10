@@ -1,0 +1,103 @@
+<div class="holdings-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Holdings</h1>
+      <p class="page-subtitle">
+        Open positions, cost basis and return · values in {{ currency.selected() }}
+      </p>
+    </div>
+    <a class="btn-accent" routerLink="/order">Trade</a>
+  </div>
+
+  @if (errorMessage()) {
+    <div class="error-banner" role="alert"><span class="icon">!</span>{{ errorMessage() }}</div>
+  }
+
+  @if (loading()) {
+    <div class="holdings-loading"><span class="spinner"></span> Loading positions…</div>
+  } @else {
+    <div class="summary-grid">
+      <div class="card summary-card">
+        <span class="summary-label">Positions value</span>
+        <span class="summary-value">{{ fmtAccountCurrency(positionsValue()) }}</span>
+        <span class="summary-sub">{{ rows().length }} instrument(s) · avg cost × qty</span>
+      </div>
+      <div class="card summary-card">
+        <span class="summary-label">Return</span>
+        @if (portfolioReturn() !== null) {
+          <span class="summary-value" [class.positive]="portfolioReturn()! >= 0" [class.negative]="portfolioReturn()! < 0">
+            {{ portfolioReturn()! >= 0 ? '+' : '' }}{{ portfolioReturn() | number: '1.2-2' }}%
+          </span>
+        } @else {
+          <span class="summary-value text-muted">—</span>
+        }
+        <span class="summary-sub">Live price against average cost</span>
+      </div>
+      <div class="card summary-card">
+        <span class="summary-label">Cash</span>
+        <span class="summary-value">{{ fmtAccountCurrency(cash()) }}</span>
+        <span class="summary-sub">{{ currency.ledger() }} account</span>
+      </div>
+      <div class="card summary-card accent">
+        <span class="summary-label">Total equity</span>
+        <span class="summary-value">{{ fmtAccountCurrency(totalEquity()) }}</span>
+        <span class="summary-sub">Cash + positions at cost</span>
+      </div>
+    </div>
+
+    <div class="card table-card">
+      <div class="card-header">
+        <span class="panel-title">Position detail</span>
+        <span class="text-muted">Amounts in {{ currency.selected() }}</span>
+      </div>
+      <div class="table-scroll">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Symbol</th>
+              <th class="right">Qty</th>
+              <th class="right">Avg cost</th>
+              <th class="right">Live price</th>
+              <th class="right">Invested</th>
+              <th class="right">Return</th>
+              <th>Weight</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (row of rows(); track row.symbol) {
+              <tr>
+                <td class="text-bold symbol-cell"><span [appChartSymbol]="row.symbol">{{ row.symbol }}</span></td>
+                <td class="right mono">{{ row.quantity | number }}</td>
+                <td class="right mono">{{ fmtAccountCurrency(row.averageCost) }}</td>
+                <td class="right mono">
+                  @if (row.mark !== null) { {{ fmtAccountCurrency(row.mark) }} } @else { <span class="text-muted" title="No live price available">—</span> }
+                </td>
+                <td class="right mono" title="Average cost × quantity">{{ fmtAccountCurrency(row.cost) }}</td>
+                <td class="right mono" [class.positive]="(row.returnPct ?? 0) >= 0" [class.negative]="(row.returnPct ?? 0) < 0">
+                  @if (row.returnPct !== null) {
+                    {{ row.returnPct >= 0 ? '+' : '' }}{{ row.returnPct | number: '1.2-2' }}%
+                  } @else {
+                    <span class="text-muted" title="No live price, so no return can be calculated">—</span>
+                  }
+                </td>
+                <td>
+                  <div class="weight-cell">
+                    <div class="weight-track"><div class="weight-fill" [style.width.%]="row.weight"></div></div>
+                    <span class="mono weight-pct">{{ row.weight | number: '1.1-1' }}%</span>
+                  </div>
+                </td>
+              </tr>
+            } @empty {
+              <tr>
+                <td colspan="7" class="empty-row">
+                  You hold no open positions.
+                  <a routerLink="/order">Place your first order</a> to get started.
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    </div>
+  }
+</div>

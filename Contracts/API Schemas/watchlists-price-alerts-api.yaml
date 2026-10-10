@@ -1,0 +1,713 @@
+openapi: 3.1.0
+
+info:
+  title: Watchlists and price alerts service
+  version: 1.0.0
+  summary: The customer's watchlist, and the price thresholds that fire on it.
+  description: |
+    Binding contract for the Watchlists & Price Alerts extension, built in Sprint 10. These
+    routes are served by the Trade REST API on 8081, as a module beside the order and account
+    routes. They are not a separate deployable.
+
+    ## Scope of this contract
+
+    A customer keeps any number of named watchlists, each holding up to 25 instruments, and can
+    move an instrument between their own lists. The singular routes under `/api/v1/watchlist`
+    (added before this contract) still work and address the customer's primary list; they are not
+    the contract here. Everything under `/api/v1/watchlists` is what a new client should call.
+
+    The second half of the module is price alerts: a customer pins a
+    price threshold to a watched instrument and the module fires when the market crosses it.
+
+    ## Watchlists
+
+    A watchlist belongs to exactly one account. Ownership is proven by the verified `accountId`
+    claim on the request, never by a parameter, so a caller can only ever reach lists they own.
+    Names are trimmed and unique per account (1-40 characters). A customer must keep at least one
+    watchlist: deleting the last one is refused with `VAL-422`. A list holds at most 25
+    instruments, enforced by the service, and each symbol can appear on a list once.
+
+    ## How a price alert fires
+
+    The module is a consumer of the `market-data` Kafka topic, in the `watchlist-service`
+    consumer group (design/kafka.md). Each quote streamed for a symbol is compared against the
+    account's *active* alerts for that symbol:
+
+    | Direction | Crosses when |
+    |---|---|
+    | `ABOVE` | last price > threshold |
+    | `BELOW` | last price < threshold |
+
+    A crossing deactivates the alert (it fires once; the status becomes `TRIGGERED`). The
+    customer creates a new alert to arm it again. Re-delivered market-data messages find the
+    alert already `TRIGGERED`, so a replay cannot re-fire or double-notify.
+
+    ## Where the notification goes
+
+    The alerts module never resolves a channel. It hands the crossing to the notifications
+    module through the `notifications.api.AlertDelivery` Java interface (never an HTTP route) —
+    that module owns the customer's channel preference, the send, and the inbox record.
+
+    ## Boundary
+
+    Alerts are keyed to the verified `accountId` claim on the request, exactly as the watchlist
+    routes are; there is no path parameter that could point at another account. A route reached
+    without an account claim (an administrator) is `403`, the same answer the watchlist routes
+    give. An alert is limited per account so a single customer cannot crowd out the evaluator.
+  contact:
+    name: Enterprise Trading Platform, programme materials
+  license:
+    name: Instructional use only
+
+servers:
+  - url: http://localhost:8081
+    description: Local development.
+  - url: http://trade-api:8081
+    description: Service name inside the Docker Compose network.
+
+tags:
+  - name: Watchlists
+    description: The customer's named watchlists and the instruments on them.
+  - name: Price alerts
+    description: Thresholds on watched instruments.
+
+security:
+  - bearerAuth: []
+
+paths:
+  /api/v1/watchlists:
+    get:
+      tags: [Watchlists]
+      operationId: listWatchlists
+      summary: List the account's watchlists
+      description: |
+        Every watchlist the authenticated account owns, each with its instruments and current
+        prices, ordered oldest first. The singular `/api/v1/watchlist` route is the first of
+        these lists.
+      responses:
+        '200':
+          description: The account's watchlists, oldest first.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Watchlist'
+              examples:
+                watchlists:
+                  value:
+                    - watchlistId: 3
+                      accountId: 1
+                      name: Tech leaders
+                      instruments:
+                        - watchlistInstrumentId: 9
+                          instrumentId: 101
+                          symbol: AAPL
+                          ticker: AAPL
+                          assetClass: EQUITY
+                          quoteCurrency: USD
+                          currentPrice: 238.50
+                          priceCurrency: USD
+                          bid: 238.48
+                          ask: 238.52
+                          change: 1.25
+                          changePercent: 0.53
+                          stale: false
+                          addedAt: '2026-10-19T12:00:00Z'
+                      createdAt: '2026-10-19T12:00:00Z'
+                      updatedAt: '2026-10-19T12:00:00Z'
+                    - watchlistId: 2
+                      accountId: 1
+                      name: My Watchlist
+                      instruments: []
+                      createdAt: '2026-10-01T09:15:00Z'
+                      updatedAt: '2026-10-01T09:15:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Watchlists]
+      operationId: createWatchlist
+      summary: Create a named watchlist
+      description: |
+        Creates an empty watchlist. The name is trimmed; an absent, empty or long name, or a name
+        already used by another of the account's watchlists, is a `422`.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWatchlist'
+            examples:
+              create:
+                value:
+                  name: Earnings watch
+      responses:
+        '200':
+          description: The new empty watchlist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Watchlist'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/watchlists/{watchlistId}:
+    patch:
+      tags: [Watchlists]
+      operationId: renameWatchlist
+      summary: Rename a watchlist
+      description: |
+        Renames one of the account's own watchlists under the same name rules as `create`. An
+        unknown or foreign id answers `404`, never a hint that the id exists elsewhere.
+      parameters:
+        - name: watchlistId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RenameWatchlist'
+            examples:
+              rename:
+                value:
+                  name: Dividend payers
+      responses:
+        '200':
+          description: The renamed watchlist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Watchlist'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/WatchlistNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+    delete:
+      tags: [Watchlists]
+      operationId: deleteWatchlist
+      summary: Delete a watchlist
+      description: |
+        Deletes one of the account's own watchlists and its entries. Deleting the account's last
+        watchlist is refused with `422`. An unknown or foreign id answers `404`.
+      parameters:
+        - name: watchlistId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '204':
+          description: The watchlist was deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/WatchlistNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/watchlists/{watchlistId}/instruments:
+    post:
+      tags: [Watchlists]
+      operationId: addWatchlistInstrument
+      summary: Add an instrument to one of the account's watchlists
+      description: |
+        Adds a quotable symbol to the named watchlist. The same rules as the legacy add route
+        apply: the symbol must exist in the market data, it cannot already be on the list, and
+        the list cannot already hold 25 instruments. An unknown or foreign watchlist id answers
+        `404`.
+      parameters:
+        - name: watchlistId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddWatchlistInstrument'
+            examples:
+              add:
+                value:
+                  symbol: INFY.NS
+      responses:
+        '200':
+          description: The watchlist with the new instrument.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Watchlist'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/WatchlistNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/watchlists/{watchlistId}/instruments/{watchlistInstrumentId}:
+    delete:
+      tags: [Watchlists]
+      operationId: removeWatchlistInstrument
+      summary: Remove an instrument from a watchlist
+      description: |
+        Removes one entry from a named watchlist. An entry that does not exist, belongs to another
+        account, or sits on a different list answers `404`, never a hint about where it is.
+      parameters:
+        - name: watchlistId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+        - name: watchlistInstrumentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: The watchlist without the removed instrument.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Watchlist'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/WatchlistNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/watchlists/instruments/{watchlistInstrumentId}/move:
+    post:
+      tags: [Watchlists]
+      operationId: moveWatchlistInstrument
+      summary: Move an instrument between the account's watchlists
+      description: |
+        Removes an entry from the watchlist holding it and adds the same symbol to the target
+        watchlist. Both lists belong to the authenticated account. Moving an entry that already
+        sits on the target (or over the 25-instrument cap) is a `422`; an entry or target that is
+        unknown, foreign or deleted answers `404`.
+      parameters:
+        - name: watchlistInstrumentId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MoveWatchlistInstrument'
+            examples:
+              move:
+                value:
+                  targetWatchlistId: 3
+      responses:
+        '200':
+          description: The target watchlist, now holding the moved instrument.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Watchlist'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/WatchlistNotFound'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/watchlist/alerts:
+    get:
+      tags: [Price alerts]
+      operationId: listPriceAlerts
+      summary: List the account's price alerts
+      description: |
+        All alerts for the authenticated account, most recent first, every status. A customer
+        sees the whole history of the thresholds they set, including the ones that fired.
+      responses:
+        '200':
+          description: The account's price alerts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PriceAlert'
+              examples:
+                alerts:
+                  value:
+                    - alertId: 12
+                      accountId: 1
+                      symbol: AAPL
+                      direction: ABOVE
+                      threshold: 240.00
+                      currency: USD
+                      status: ACTIVE
+                      triggeredPrice: null
+                      triggeredAt: null
+                      createdAt: '2026-10-19T12:00:00Z'
+                    - alertId: 9
+                      accountId: 1
+                      symbol: GOOGL
+                      direction: BELOW
+                      threshold: 170.00
+                      currency: USD
+                      status: TRIGGERED
+                      triggeredPrice: 169.40
+                      triggeredAt: '2026-10-19T14:03:22Z'
+                      createdAt: '2026-10-01T09:15:00Z'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+    post:
+      tags: [Price alerts]
+      operationId: createPriceAlert
+      summary: Arm a price threshold on a watched instrument
+      description: |
+        Arms a one-shot alert. The symbol must be one the platform can quote. An active alert
+        with the same symbol, direction and threshold is returned unchanged (creating it twice
+        is not an error). An account may hold at most 20 active alerts.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreatePriceAlert'
+            examples:
+              create:
+                value:
+                  symbol: AAPL
+                  direction: ABOVE
+                  threshold: 240.00
+      responses:
+        '200':
+          description: The alert, whether newly created or already active.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceAlert'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /api/v1/watchlist/alerts/{alertId}:
+    delete:
+      tags: [Price alerts]
+      operationId: cancelPriceAlert
+      summary: Cancel a price alert
+      description: |
+        Disarms the alert. Cancelling an alert that has already fired or already been cancelled
+        returns it unchanged: the operation is idempotent. A foreign or unknown id answers the
+        same `404`, never a hint that the id exists under another account.
+      parameters:
+        - name: alertId
+          in: path
+          required: true
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+      responses:
+        '200':
+          description: The alert with its current status.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PriceAlert'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/AlertNotFound'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        The same access token the Trade REST API accepts, issued by the auth service. The
+        signature is verified as on every other `/api/**` route.
+
+  responses:
+    Unauthorised:
+      description: Missing, malformed, expired or wrongly signed token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            unauthorised:
+              value:
+                errorCode: AUTH-401
+                message: Unauthorised
+    Forbidden:
+      description: The token carries no account claim, as an administrator's does not.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            forbidden:
+              value:
+                errorCode: ACC-403
+                message: Account not accessible
+    InvalidInput:
+      description: The body failed validation, or the symbol is not quotable.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            invalid:
+              value:
+                errorCode: VAL-422
+                message: Invalid input
+    AlertNotFound:
+      description: No alert with that id belongs to this account.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                errorCode: ACC-404
+                message: Alert not found
+    WatchlistNotFound:
+      description: No watchlist with that id belongs to this account.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          examples:
+            notFound:
+              value:
+                errorCode: ACC-404
+                message: Watchlist not found
+
+  schemas:
+
+    Watchlist:
+      type: object
+      additionalProperties: false
+      required: [watchlistId, accountId, name, instruments, createdAt, updatedAt]
+      properties:
+        watchlistId:
+          type: integer
+          format: int64
+        accountId:
+          type: integer
+          format: int64
+        name:
+          type: string
+          maxLength: 40
+        instruments:
+          type: array
+          items:
+            $ref: '#/components/schemas/WatchlistInstrument'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+
+    WatchlistInstrument:
+      type: object
+      additionalProperties: false
+      required: [watchlistInstrumentId, instrumentId, symbol, ticker, assetClass, quoteCurrency, addedAt, stale]
+      properties:
+        watchlistInstrumentId:
+          type: integer
+          format: int64
+        instrumentId:
+          type: integer
+          format: int64
+        symbol:
+          type: string
+          maxLength: 20
+        ticker:
+          type: string
+          maxLength: 20
+        assetClass:
+          type: string
+        quoteCurrency:
+          type: string
+          maxLength: 3
+        currentPrice:
+          type: [number, 'null']
+        priceCurrency:
+          type: string
+          maxLength: 3
+        bid:
+          type: [number, 'null']
+        ask:
+          type: [number, 'null']
+        change:
+          type: [number, 'null']
+        changePercent:
+          type: [number, 'null']
+        stale:
+          type: boolean
+        addedAt:
+          type: string
+          format: date-time
+
+    CreateWatchlist:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+
+    RenameWatchlist:
+      type: object
+      additionalProperties: false
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 40
+
+    AddWatchlistInstrument:
+      type: object
+      additionalProperties: false
+      required: [symbol]
+      properties:
+        symbol:
+          type: string
+          minLength: 1
+          maxLength: 20
+
+    MoveWatchlistInstrument:
+      type: object
+      additionalProperties: false
+      required: [targetWatchlistId]
+      properties:
+        targetWatchlistId:
+          type: integer
+          format: int64
+          minimum: 1
+
+    PriceAlert:
+      type: object
+      additionalProperties: false
+      required: [alertId, accountId, symbol, direction, threshold, status, createdAt]
+      properties:
+        alertId:
+          type: integer
+          format: int64
+        accountId:
+          type: integer
+          format: int64
+        symbol:
+          type: string
+          maxLength: 20
+        direction:
+          type: string
+          enum: [ABOVE, BELOW]
+        threshold:
+          type: number
+          format: double
+          description: The price the symbol must cross to fire.
+        currency:
+          type: [string, 'null']
+          description: |
+            The currency the threshold is priced in — the symbol's own quote currency, so a
+            threshold is always compared against the symbol's market price in the same unit.
+            May be missing only when the symbol is not in market data any more.
+        status:
+          type: string
+          enum: [ACTIVE, TRIGGERED, CANCELLED]
+          description: |
+            - `ACTIVE` - armed, being evaluated against the market-data stream.
+            - `TRIGGERED` - fired once; deactivated.
+            - `CANCELLED` - the customer disarmed it.
+        triggeredPrice:
+          type: [number, 'null']
+        triggeredAt:
+          type: [string, 'null']
+          format: date-time
+        createdAt:
+          type: string
+          format: date-time
+
+    CreatePriceAlert:
+      type: object
+      additionalProperties: false
+      required: [symbol, direction, threshold]
+      properties:
+        symbol:
+          type: string
+          maxLength: 20
+          minLength: 1
+        direction:
+          type: string
+          enum: [ABOVE, BELOW]
+        threshold:
+          type: number
+          format: double
+          exclusiveMinimum: 0
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      properties:
+        errorCode:
+          type: string
+          enum: [ACC-404, ACC-403, AUTH-401, VAL-422]
+          description: The platform error codes, used unchanged. No code is invented for this module.
+        message:
+          type: string

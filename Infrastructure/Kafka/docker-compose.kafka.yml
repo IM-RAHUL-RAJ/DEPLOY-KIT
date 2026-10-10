@@ -1,0 +1,47 @@
+# ==============================================================================
+# Kafka on its own, for the "Kafka in Docker, everything else on the host" setup
+# in RUNNING.md. Run it on the machine that hosts the team broker:
+#
+#   KAFKA_ADVERTISED_HOST=10.8.68.169 docker compose -f docker-compose.kafka.yml up -d
+#
+# KAFKA_ADVERTISED_HOST is the address OTHER machines reach this one on. Kafka
+# hands that address back to every client, so with "localhost" here only this
+# machine could connect. Clients then set, in sprint9/.env:
+#
+#   KAFKA_BOOTSTRAP_SERVERS=10.8.68.169:9092
+#
+# The container is named trading-kafka, which is the name
+# Infrastructure/Kafka/scripts/create-topics.sh falls back to.
+# ==============================================================================
+
+services:
+  kafka:
+    image: apache/kafka:3.8.0
+    container_name: trading-kafka
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@localhost:29093
+      KAFKA_LISTENERS: INTERNAL://:29092,CONTROLLER://:29093,EXTERNAL://:9092
+      KAFKA_ADVERTISED_LISTENERS: INTERNAL://localhost:29092,EXTERNAL://${KAFKA_ADVERTISED_HOST:?set KAFKA_ADVERTISED_HOST (the address other machines reach this one on)}:9092
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: INTERNAL:PLAINTEXT,CONTROLLER:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_INTER_BROKER_LISTENER_NAME: INTERNAL
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      # Topics are created explicitly with their contracted shape, never on first use.
+      KAFKA_AUTO_CREATE_TOPICS_ENABLE: "false"
+    ports:
+      - "9092:9092"
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    healthcheck:
+      test: ["CMD-SHELL", "/opt/kafka/bin/kafka-broker-api-versions.sh --bootstrap-server localhost:29092 > /dev/null 2>&1"]
+      interval: 10s
+      timeout: 10s
+      retries: 12
+    restart: unless-stopped
+
+volumes:
+  kafka-data:

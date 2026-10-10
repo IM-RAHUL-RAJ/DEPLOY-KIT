@@ -1,0 +1,132 @@
+.asof-line {
+  font-size: 12px;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 13px 16px;
+  border: 1px solid rgba(255, 201, 60, 0.32);
+  border-radius: var(--radius-sm);
+  background: var(--accent-yellow-soft);
+  color: var(--warning);
+  font-size: 13px;
+
+  .icon {
+    flex-shrink: 0;
+    font-weight: 800;
+  }
+}
+
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+@media (max-width: 1000px) {
+  .stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 560px) {
+  .stat-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 20px 22px;
+}
+
+.stat-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.stat-value {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  font-size: 22px;
+  font-weight: 700;
+  color: var(--text-primary);
+
+  &.sm {
+    font-size: 18px;
+  }
+}
+
+.stat-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+// pnlClass() returns positive / negative / flat; the theme colours come from styles.scss.
+.stat-value.positive,
+.stat-sub.positive,
+td.positive {
+  color: var(--positive);
+}
+
+.stat-value.negative,
+.stat-sub.negative,
+td.negative {
+  color: var(--negative);
+}
+
+.pnl-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.pnl-total {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px 18px;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  background: var(--panel-tint);
+}
+
+.pnl-table thead th {
+  position: static;
+  background: transparent;
+}
+
+.data-table td.right {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.symbol-cell {
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+}
+
+.stale-row td {
+  background: rgba(255, 201, 60, 0.04);
+}
+
+.stale-badge {
+  margin-left: 8px;
+}
+
+@media (max-width: 720px) {
+  .pnl-totals {
+    grid-template-columns: 1fr;
+  }
+}

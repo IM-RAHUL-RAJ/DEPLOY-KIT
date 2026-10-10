@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.mapper.InstrumentMapper">
+
+    <select id="findBySymbol" resultType="com.trading.tradeapi.entity.InstrumentRecord">
+        SELECT instrument_id AS instrumentId,
+               symbol,
+               ticker,
+               asset_class AS assetClass,
+               quote_currency AS quoteCurrency,
+               status,
+               delisted_at AS delistedAt
+        FROM instrument
+        WHERE symbol = #{symbol}
+    </select>
+
+    <select id="findById" resultType="com.trading.tradeapi.entity.InstrumentRecord">
+        SELECT instrument_id AS instrumentId,
+               symbol,
+               ticker,
+               asset_class AS assetClass,
+               quote_currency AS quoteCurrency,
+               status,
+               delisted_at AS delistedAt
+        FROM instrument
+        WHERE instrument_id = #{id}
+    </select>
+
+    <!-- Registers an instrument discovered via the Fauxnance API. Idempotent:
+         a concurrent insert of the same symbol is ignored. -->
+    <insert id="upsertDiscoveredInstrument">
+        INSERT INTO instrument (symbol, ticker, asset_class, quote_currency, status)
+        VALUES (#{symbol}, #{ticker}, 'EQUITY', COALESCE(UPPER(#{quoteCurrency,jdbcType=VARCHAR}), 'USD'), #{status})
+        ON CONFLICT (symbol) DO NOTHING
+    </insert>
+
+</mapper>

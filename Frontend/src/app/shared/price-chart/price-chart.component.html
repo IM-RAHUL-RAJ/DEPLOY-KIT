@@ -1,0 +1,171 @@
+<div class="pc">
+  @if (showToolbar()) {
+    <div class="pc-toolbar">
+      <div class="pc-ranges" role="tablist" aria-label="Time range">
+        @for (r of ranges; track r) {
+          <button type="button" role="tab" [attr.aria-selected]="range() === r"
+                  [class.active]="range() === r" (click)="setRange(r)">{{ r }}</button>
+        }
+      </div>
+      <div class="pc-tools">
+        <div class="pc-styles" role="radiogroup" aria-label="Chart style">
+          @for (s of styles; track s.value) {
+            <button type="button" role="radio" [attr.aria-checked]="style() === s.value"
+                    [class.active]="style() === s.value" (click)="setStyle(s.value)" [title]="s.label">
+              @switch (s.value) {
+                @case ('candles') {
+                  <svg viewBox="0 0 24 24"><path d="M7 3v4M7 17v4M17 5v3M17 16v3"/><rect x="5" y="7" width="4" height="10" rx="1"/><rect x="15" y="8" width="4" height="8" rx="1"/></svg>
+                }
+                @case ('line') {
+                  <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 9-10"/></svg>
+                }
+                @default {
+                  <svg viewBox="0 0 24 24"><path d="M3 17l5-6 4 4 9-10v16H3z" class="fill"/></svg>
+                }
+              }
+            </button>
+          }
+        </div>
+        <button type="button" class="pc-toggle" [class.active]="showVolume()" (click)="showVolume.set(!showVolume())"
+                title="Volume">Vol</button>
+        <button type="button" class="pc-toggle pc-help" [class.active]="showGlossary()" (click)="showGlossary.set(!showGlossary())"
+                [attr.aria-expanded]="showGlossary()" title="What do these lines mean?" aria-label="What do these lines mean?">?</button>
+      </div>
+    </div>
+
+    @if (availableOverlays().length) {
+      <div class="pc-overlays">
+        @for (o of availableOverlays(); track o) {
+          <button type="button" class="pc-chip" [class.active]="active().has(o)" (click)="toggleOverlay(o)"
+                  [attr.aria-pressed]="active().has(o)" [title]="overlayHelp[o]">
+            <span class="swatch" [style.background]="overlayColors[o]"></span>{{ overlayLabels[o] }}
+          </button>
+        }
+      </div>
+    }
+  }
+
+  @if (showGlossary()) {
+    <dl class="pc-glossary">
+      @for (g of glossary; track g.term) {
+        <div>
+          <dt>@if (g.color) {<span class="swatch" [style.background]="g.color"></span>}{{ g.term }}</dt>
+          <dd>{{ g.meaning }}</dd>
+        </div>
+      }
+    </dl>
+  }
+
+  <div class="pc-readout" aria-live="polite">
+    @if (hovered(); as h) {
+      <span class="pc-date">{{ formatDate(h.bar.time) }}</span>
+      <span>O <b>{{ h.bar.open | number: '1.2-2' }}</b></span>
+      <span>H <b>{{ h.bar.high | number: '1.2-2' }}</b></span>
+      <span>L <b>{{ h.bar.low | number: '1.2-2' }}</b></span>
+      <span>C <b>{{ h.bar.close | number: '1.2-2' }}</b></span>
+      <span [class.up]="h.change >= 0" [class.down]="h.change < 0">
+        {{ h.change >= 0 ? '+' : '' }}{{ h.change | number: '1.2-2' }} ({{ h.changePercent >= 0 ? '+' : '' }}{{ h.changePercent | number: '1.2-2' }}%)
+      </span>
+      <span>Vol <b>{{ formatVolume(h.bar.volume) }}</b></span>
+    } @else if (stats(); as s) {
+      <span class="pc-date">{{ range() }} · {{ s.from }} → {{ s.to }}</span>
+      <span [class.up]="s.change >= 0" [class.down]="s.change < 0">
+        {{ s.change >= 0 ? '+' : '' }}{{ s.change | number: '1.2-2' }} ({{ s.changePercent >= 0 ? '+' : '' }}{{ s.changePercent | number: '1.2-2' }}%)
+      </span>
+      <span>High <b>{{ s.high | number: '1.2-2' }}</b></span>
+      <span>Low <b>{{ s.low | number: '1.2-2' }}</b></span>
+      @if (s.avgVolume !== null) {
+        <span>Avg vol <b>{{ formatVolume(s.avgVolume) }}</b></span>
+      }
+      @if (currency()) {
+        <span class="pc-ccy">{{ currency() }}</span>
+      }
+    }
+  </div>
+
+  <div class="pc-canvas" [style.height.px]="height()">
+    @if (loading()) {
+      <div class="pc-state">
+        <div class="pc-skeleton"></div>
+        <span>{{ pending() ? 'Fetching price history… this takes a few seconds the first time.' : 'Loading chart…' }}</span>
+      </div>
+    } @else if (error()) {
+      <div class="pc-state">
+        <svg viewBox="0 0 24 24" class="pc-state-icon"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+        <span>{{ error() }}</span>
+        <button type="button" class="btn-ghost btn-sm" (click)="retry()">Try again</button>
+      </div>
+    } @else if (geometry(); as g) {
+      <svg class="pc-svg" [attr.viewBox]="'0 0 ' + plot().w + ' ' + plot().h" [attr.width]="plot().w"
+           [attr.height]="plot().h" preserveAspectRatio="none"
+           (pointermove)="onPointerMove($event)" (pointerleave)="onPointerLeave()"
+           role="img" [attr.aria-label]="symbol() + ' price chart, ' + range()">
+        <defs>
+          <linearGradient [attr.id]="'pc-area-' + symbol()" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" class="area-top"/>
+            <stop offset="100%" class="area-bottom"/>
+          </linearGradient>
+        </defs>
+
+        <!-- grid -->
+        @for (t of g.yTicks; track t.label) {
+          <line class="grid" [attr.x1]="plot().left" [attr.x2]="plot().right" [attr.y1]="t.pos" [attr.y2]="t.pos"/>
+          <text class="axis y" [attr.x]="plot().right + 8" [attr.y]="t.pos + 4">{{ t.label }}</text>
+        }
+        @for (t of g.xTicks; track $index) {
+          <text class="axis x" [attr.x]="t.pos" [attr.y]="plot().h - 8" text-anchor="middle">{{ t.label }}</text>
+        }
+
+        <!-- volume -->
+        @if (plot().volumeOn) {
+          @for (b of g.bars; track $index) {
+            <rect class="vol" [class.up]="b.up" [class.down]="!b.up" [attr.x]="b.x - g.bodyW / 2" [attr.y]="b.volY"
+                  [attr.width]="g.bodyW" [attr.height]="b.volH"/>
+          }
+        }
+
+        <!-- price -->
+        @switch (style()) {
+          @case ('candles') {
+            @for (b of g.bars; track $index) {
+              <line class="wick" [class.up]="b.up" [class.down]="!b.up" [attr.x1]="b.x" [attr.x2]="b.x"
+                    [attr.y1]="b.wickTop" [attr.y2]="b.wickBottom"/>
+              <rect class="body" [class.up]="b.up" [class.down]="!b.up" [attr.x]="b.x - g.bodyW / 2" [attr.y]="b.bodyY"
+                    [attr.width]="g.bodyW" [attr.height]="b.bodyH" rx="1"/>
+            }
+          }
+          @case ('area') {
+            <path class="area" [attr.d]="g.area" [attr.fill]="'url(#pc-area-' + symbol() + ')'"/>
+            <path class="price-line" [attr.d]="g.line"/>
+          }
+          @default {
+            <path class="price-line" [attr.d]="g.line"/>
+          }
+        }
+
+        <!-- overlays -->
+        @for (o of g.overlays; track o.key) {
+          <path class="overlay" [attr.d]="o.d" [attr.stroke]="o.color" [class.dashed]="o.dashed"/>
+        }
+
+        <!-- last price -->
+        <line class="last-line" [class.up]="g.lastUp" [class.down]="!g.lastUp" [attr.x1]="plot().left"
+              [attr.x2]="plot().right" [attr.y1]="g.lastY" [attr.y2]="g.lastY"/>
+        <rect class="tag" [class.up]="g.lastUp" [class.down]="!g.lastUp" [attr.x]="plot().right + 2"
+              [attr.y]="g.lastY - 9" width="60" height="18" rx="4"/>
+        <text class="tag-text" [attr.x]="plot().right + 8" [attr.y]="g.lastY + 4">{{ g.lastLabel }}</text>
+
+        <!-- crosshair -->
+        @if (crosshair(); as c) {
+          <line class="cross" [attr.x1]="c.x" [attr.x2]="c.x" [attr.y1]="plot().top" [attr.y2]="plot().volBottom"/>
+          <line class="cross" [attr.x1]="plot().left" [attr.x2]="plot().right" [attr.y1]="c.y" [attr.y2]="c.y"/>
+          <circle class="cross-dot" [attr.cx]="c.x" [attr.cy]="c.y" r="3.5"/>
+          <rect class="tag hover-tag" [attr.x]="plot().right + 2" [attr.y]="c.y - 9" width="60" height="18" rx="4"/>
+          <text class="tag-text" [attr.x]="plot().right + 8" [attr.y]="c.y + 4">{{ c.label }}</text>
+        }
+      </svg>
+    } @else {
+      <div class="pc-state"><span>No price history yet for {{ symbol() }}.</span></div>
+    }
+  </div>
+</div>

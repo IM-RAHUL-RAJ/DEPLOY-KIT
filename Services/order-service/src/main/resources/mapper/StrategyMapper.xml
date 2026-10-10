@@ -1,0 +1,213 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.strategy.mapper.StrategyMapper">
+
+    <!-- Unqualified like the other mappers: currentSchema=trading in Postgres, no schema in H2. -->
+
+    <sql id="strategy_columns">
+        strategy_id          AS strategyId,
+        account_id           AS accountId,
+        name,
+        symbol,
+        strategy_type        AS strategyType,
+        side,
+        target_price         AS targetPrice,
+        order_type           AS orderType,
+        short_window         AS shortWindow,
+        long_window          AS longWindow,
+        band_period          AS bandPeriod,
+        band_k               AS bandK,
+        quantity,
+        max_notional         AS maxNotional,
+        max_orders_per_day   AS maxOrdersPerDay,
+        max_position         AS maxPosition,
+        status,
+        stop_reason          AS stopReason,
+        last_state           AS lastState,
+        last_price           AS lastPrice,
+        last_evaluated_at    AS lastEvaluatedAt,
+        consecutive_failures AS consecutiveFailures,
+        created_at           AS createdAt,
+        updated_at           AS updatedAt
+    </sql>
+
+    <select id="findActiveBySymbol" resultType="com.trading.tradeapi.strategy.entity.StrategyRecord">
+        SELECT <include refid="strategy_columns"/>
+        FROM trading_strategy
+        WHERE symbol = #{symbol}
+          AND status = 'ACTIVE'
+        ORDER BY strategy_id
+    </select>
+
+    <select id="findActiveSymbols" resultType="string">
+        SELECT DISTINCT symbol FROM trading_strategy WHERE status = 'ACTIVE' ORDER BY symbol
+    </select>
+
+    <select id="findActiveTarget" resultType="com.trading.tradeapi.strategy.entity.StrategyRecord">
+        SELECT <include refid="strategy_columns"/>
+        FROM trading_strategy
+        WHERE account_id = #{accountId}
+          AND symbol = #{symbol}
+          AND strategy_type = 'PRICE_TARGET'
+          AND side = #{side}
+          AND target_price = #{targetPrice}
+          AND quantity = #{quantity}
+          AND status = 'ACTIVE'
+        ORDER BY strategy_id
+        LIMIT 1
+    </select>
+
+    <select id="findById" resultType="com.trading.tradeapi.strategy.entity.StrategyRecord">
+        SELECT <include refid="strategy_columns"/>
+        FROM trading_strategy
+        WHERE strategy_id = #{strategyId}
+    </select>
+
+    <select id="findByIdAndAccount" resultType="com.trading.tradeapi.strategy.entity.StrategyRecord">
+        SELECT <include refid="strategy_columns"/>
+        FROM trading_strategy
+        WHERE strategy_id = #{strategyId}
+          AND account_id = #{accountId}
+    </select>
+
+    <select id="findByAccount" resultType="com.trading.tradeapi.strategy.entity.StrategyRecord">
+        SELECT <include refid="strategy_columns"/>
+        FROM trading_strategy
+        WHERE account_id = #{accountId}
+        ORDER BY created_at DESC, strategy_id DESC
+    </select>
+
+    <select id="countByAccount" resultType="int">
+        SELECT COUNT(*) FROM trading_strategy WHERE account_id = #{accountId} AND status &lt;&gt; 'COMPLETED'
+    </select>
+
+    <insert id="insert" useGeneratedKeys="true" keyProperty="strategyId" keyColumn="strategy_id">
+        INSERT INTO trading_strategy (account_id, name, symbol, strategy_type, side, target_price, order_type,
+                                      short_window, long_window,
+                                      band_period, band_k, quantity, max_notional, max_orders_per_day, max_position, status)
+        VALUES (#{accountId}, #{name}, #{symbol}, #{strategyType}, #{side}, #{targetPrice}, #{orderType},
+                #{shortWindow}, #{longWindow},
+                #{bandPeriod}, #{bandK}, #{quantity}, #{maxNotional}, #{maxOrdersPerDay}, #{maxPosition}, 'ACTIVE')
+    </insert>
+
+    <!-- Resuming clears the stop and the failure count, and forgets the last state so the
+         first quote afterwards only re-establishes where things stand: a crossover that
+         happened while the strategy was paused is not traded late. -->
+    <update id="updateStatus">
+        UPDATE trading_strategy
+        SET status = #{status},
+            stop_reason = NULL,
+            consecutive_failures = 0,
+            last_state = CASE WHEN #{status} = 'ACTIVE' THEN NULL ELSE last_state END,
+            updated_at = CURRENT_TIMESTAMP
+        WHERE strategy_id = #{strategyId}
+          AND account_id = #{accountId}
+    </update>
+
+    <delete id="delete">
+        DELETE FROM trading_strategy
+        WHERE strategy_id = #{strategyId}
+          AND account_id = #{accountId}
+    </delete>
+
+    <update id="recordEvaluation">
+        UPDATE trading_strategy
+        SET last_state = COALESCE(#{state}, last_state),
+            last_price = #{price},
+            last_evaluated_at = #{at}
+        WHERE strategy_id = #{strategyId}
+          AND status = 'ACTIVE'
+    </update>
+
+    <update id="resetFailures">
+        UPDATE trading_strategy SET consecutive_failures = 0 WHERE strategy_id = #{strategyId}
+    </update>
+
+    <update id="incrementFailures">
+        UPDATE trading_strategy
+        SET consecutive_failures = consecutive_failures + 1
+        WHERE strategy_id = #{strategyId}
+    </update>
+
+    <update id="stop">
+        UPDATE trading_strategy
+        SET status = 'STOPPED',
+            stop_reason = #{reason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE strategy_id = #{strategyId}
+          AND status = 'ACTIVE'
+    </update>
+
+    <!-- The claim on a decision, and the last word on whether the strategy may act: the row
+         is written only while the strategy is ACTIVE at this instant. A pause committed a
+         moment ago makes this insert 0 rows and no order follows. -->
+    <!-- A one-shot rule that has done its job: kept for its history, never evaluated again. -->
+    <update id="complete">
+        UPDATE trading_strategy
+        SET status = 'COMPLETED',
+            stop_reason = #{reason},
+            updated_at = CURRENT_TIMESTAMP
+        WHERE strategy_id = #{strategyId}
+          AND status = 'ACTIVE'
+    </update>
+
+    <insert id="insertExecution" useGeneratedKeys="true" keyProperty="executionId" keyColumn="execution_id">
+        INSERT INTO strategy_execution (strategy_id, event_id, signal, price, quantity, status, reason)
+        SELECT #{strategyId}, #{eventId}, #{signal}, #{price}, #{quantity}, #{status}, #{reason}
+        FROM trading_strategy
+        WHERE strategy_id = #{strategyId}
+          AND status = 'ACTIVE'
+    </insert>
+
+    <update id="completeExecution">
+        UPDATE strategy_execution
+        SET status = #{status},
+            order_id = #{orderId},
+            reason = #{reason}
+        WHERE execution_id = #{executionId}
+          AND status = 'PENDING'
+    </update>
+
+    <!-- PENDING counts too: an order in flight is an order against today's limit. -->
+    <select id="countPlacedSince" resultType="int">
+        SELECT COUNT(*)
+        FROM strategy_execution
+        WHERE strategy_id = #{strategyId}
+          AND status IN ('PENDING', 'PLACED')
+          AND created_at &gt;= #{since}
+    </select>
+
+    <select id="findExecutions" resultType="com.trading.tradeapi.strategy.entity.StrategyExecutionRecord">
+        SELECT execution_id AS executionId,
+               strategy_id  AS strategyId,
+               event_id     AS eventId,
+               signal,
+               price,
+               quantity,
+               status,
+               order_id     AS orderId,
+               reason,
+               created_at   AS createdAt
+        FROM strategy_execution
+        WHERE strategy_id = #{strategyId}
+        ORDER BY created_at DESC, execution_id DESC
+        LIMIT #{limit}
+    </select>
+    <!-- An order placed under the strategy's idempotency key exists even when the call that
+         placed it timed out: the answer to "did it trade?" is the orders table, not the call. -->
+    <select id="findOrderIdByIdempotencyKey" resultType="string">
+        SELECT 'ORD-' || order_id
+        FROM orders
+        WHERE idempotency_key = #{idempotencyKey}
+    </select>
+
+    <select id="findLatestOrderIdForStrategy" resultType="string">
+        SELECT 'ORD-' || order_id
+        FROM orders
+        WHERE idempotency_key LIKE 'strategy-' || #{strategyId} || '-%'
+        ORDER BY order_id DESC
+        LIMIT 1
+    </select>
+</mapper>

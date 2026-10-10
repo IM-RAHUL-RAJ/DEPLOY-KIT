@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.watchlist.mapper.WatchlistMapper">
+
+    <select id="findByAccountId" resultType="com.trading.tradeapi.watchlist.entity.WatchlistRecord">
+        SELECT watchlist_id AS watchlistId,
+               account_id AS accountId,
+               name AS name,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM watchlist
+        WHERE account_id = #{accountId}
+        ORDER BY watchlist_id ASC
+        LIMIT 1
+    </select>
+
+    <select id="findAllByAccountId" resultType="com.trading.tradeapi.watchlist.entity.WatchlistRecord">
+        SELECT watchlist_id AS watchlistId,
+               account_id AS accountId,
+               name AS name,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM watchlist
+        WHERE account_id = #{accountId}
+        ORDER BY watchlist_id ASC
+    </select>
+
+    <select id="findByIdAndAccountId" resultType="com.trading.tradeapi.watchlist.entity.WatchlistRecord">
+        SELECT watchlist_id AS watchlistId,
+               account_id AS accountId,
+               name AS name,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM watchlist
+        WHERE watchlist_id = #{watchlistId}
+          AND account_id = #{accountId}
+    </select>
+
+    <select id="findByAccountIdAndName" resultType="com.trading.tradeapi.watchlist.entity.WatchlistRecord">
+        SELECT watchlist_id AS watchlistId,
+               account_id AS accountId,
+               name AS name,
+               created_at AS createdAt,
+               updated_at AS updatedAt
+        FROM watchlist
+        WHERE account_id = #{accountId}
+          AND name = #{name}
+    </select>
+
+    <select id="countByAccountId" resultType="int">
+        SELECT COUNT(*)
+        FROM watchlist
+        WHERE account_id = #{accountId}
+    </select>
+
+    <insert id="createWatchlist">
+        INSERT INTO watchlist (account_id, created_at, updated_at)
+        VALUES (#{accountId}, now(), now())
+    </insert>
+
+    <insert id="createNamedWatchlist">
+        INSERT INTO watchlist (account_id, name, created_at, updated_at)
+        VALUES (#{accountId}, #{name}, now(), now())
+    </insert>
+
+    <update id="renameWatchlist">
+        UPDATE watchlist
+        SET name = #{name}, updated_at = now()
+        WHERE watchlist_id = #{watchlistId}
+    </update>
+
+    <delete id="deleteWatchlist">
+        DELETE FROM watchlist
+        WHERE watchlist_id = #{watchlistId}
+    </delete>
+
+    <update id="updateWatchlistTimestamp">
+        UPDATE watchlist
+        SET updated_at = now()
+        WHERE watchlist_id = #{watchlistId}
+    </update>
+
+    <select id="findInstrumentsByWatchlistId" resultType="com.trading.tradeapi.watchlist.entity.WatchlistInstrumentRecord">
+        SELECT watchlist_instrument_id AS watchlistInstrumentId,
+               watchlist_id AS watchlistId,
+               instrument_id AS instrumentId,
+               added_at AS addedAt
+        FROM watchlist_instrument
+        WHERE watchlist_id = #{watchlistId}
+        ORDER BY added_at DESC
+    </select>
+
+    <select id="findInstrumentByIdAndAccount" resultType="com.trading.tradeapi.watchlist.entity.WatchlistInstrumentRecord">
+        SELECT wi.watchlist_instrument_id AS watchlistInstrumentId,
+               wi.watchlist_id AS watchlistId,
+               wi.instrument_id AS instrumentId,
+               wi.added_at AS addedAt
+        FROM watchlist_instrument wi
+        JOIN watchlist w ON w.watchlist_id = wi.watchlist_id
+        WHERE wi.watchlist_instrument_id = #{watchlistInstrumentId}
+          AND w.account_id = #{accountId}
+    </select>
+
+    <insert id="addInstrument">
+        INSERT INTO watchlist_instrument (watchlist_id, instrument_id, added_at)
+        VALUES (#{watchlistId}, #{instrumentId}, now())
+    </insert>
+
+    <delete id="removeInstrument">
+        DELETE FROM watchlist_instrument
+        WHERE watchlist_instrument_id = #{watchlistInstrumentId}
+    </delete>
+
+    <select id="countInstruments" resultType="int">
+        SELECT COUNT(*)
+        FROM watchlist_instrument
+        WHERE watchlist_id = #{watchlistId}
+    </select>
+
+    <select id="hasInstrument" resultType="boolean">
+        SELECT EXISTS(
+            SELECT 1 FROM watchlist_instrument
+            WHERE watchlist_id = #{watchlistId}
+            AND instrument_id = #{instrumentId}
+        )
+    </select>
+
+    <select id="findQuoteByInstrumentId" resultType="com.trading.tradeapi.entity.InstrumentQuoteRecord">
+        SELECT quote_id AS quoteId,
+               instrument_id AS instrumentId,
+               symbol,
+               current_price AS currentPrice,
+               currency,
+               bid,
+               ask,
+               change,
+               change_percent AS changePercent,
+               last_updated AS lastUpdated,
+               stale
+        FROM instrument_quote
+        WHERE instrument_id = #{instrumentId}
+    </select>
+
+    <insert id="upsertQuote">
+        INSERT INTO instrument_quote (instrument_id, symbol, current_price, currency, bid, ask, change, change_percent, last_updated, stale)
+        VALUES (#{instrumentId}, #{symbol}, #{currentPrice}, #{currency}, #{bid}, #{ask}, #{change}, #{changePercent}, now(), #{stale})
+        ON CONFLICT (instrument_id) DO UPDATE SET
+            current_price = EXCLUDED.current_price,
+            currency = EXCLUDED.currency,
+            bid = EXCLUDED.bid,
+            ask = EXCLUDED.ask,
+            change = EXCLUDED.change,
+            change_percent = EXCLUDED.change_percent,
+            last_updated = EXCLUDED.last_updated,
+            stale = EXCLUDED.stale
+    </insert>
+
+    <select id="findAllWatchlistInstrumentIds" resultType="java.lang.Long">
+        SELECT DISTINCT instrument_id
+        FROM watchlist_instrument
+        ORDER BY instrument_id
+    </select>
+
+</mapper>

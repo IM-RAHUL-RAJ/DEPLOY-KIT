@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<!DOCTYPE mapper
+        PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.mapper.UserMapper">
+
+    <!-- roles is the single source of truth; user_type is derived from it. -->
+    <select id="findUserByUuid" resultType="map">
+        SELECT user_id,
+               uuid,
+               CASE WHEN 'ADMIN' = ANY (roles) THEN 'admin' ELSE 'client' END AS user_type,
+               status
+        FROM auth.users
+        WHERE uuid = #{uuid}::uuid
+    </select>
+
+</mapper>

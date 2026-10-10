@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.trading.tradeapi.portfolio.mapper.PortfolioMapper">
+
+    <select id="findFilledOrdersByAccountId"
+            resultType="com.trading.tradeapi.portfolio.entity.FilledOrderRow">
+        SELECT o.ticker     AS symbol,
+               o.side       AS side,
+               o.quantity   AS quantity,
+               o.executed_price AS executedPrice,
+               o.executed_on    AS executedOn
+        FROM orders o
+        WHERE o.account_id = #{accountId}
+          AND o.status = 'FILLED'
+          AND o.executed_on IS NOT NULL
+        ORDER BY o.executed_on ASC, o.order_id ASC
+    </select>
+
+    <select id="findFilledOrdersByAccountIdBetween"
+            resultType="com.trading.tradeapi.portfolio.entity.FilledOrderRow">
+        SELECT o.ticker     AS symbol,
+               o.side       AS side,
+               o.quantity   AS quantity,
+               o.executed_price AS executedPrice,
+               o.executed_on    AS executedOn
+        FROM orders o
+        WHERE o.account_id = #{accountId}
+          AND o.status = 'FILLED'
+          AND o.executed_on IS NOT NULL
+          AND o.executed_on &gt;= #{executedOn}
+        ORDER BY o.executed_on ASC, o.order_id ASC
+    </select>
+
+</mapper>

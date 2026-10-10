@@ -1,0 +1,395 @@
+<div class="ticket-page">
+  <div class="page-header">
+    <div>
+      <h1 class="page-title">Order Execution Ticket</h1>
+      <p class="page-subtitle">
+        Limit orders carry your price. Market orders are priced by the service from the
+        live book.
+      </p>
+    </div>
+  </div>
+
+  <div class="ticket-layout">
+    <div class="card ticket-card">
+      <div class="card-radial-glow"></div>
+
+      @if (isSuspended()) {
+        <div class="suspended-panel">
+          <div class="suspended-icon">
+            <svg class="i" viewBox="0 0 24 24">
+              <path d="M12 9v4M12 17h.01"/>
+              <path d="M10.3 3.3 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.3a2 2 0 0 0-3.4 0z"/>
+            </svg>
+          </div>
+          <h2>Account Suspended</h2>
+          <p class="suspended-message">
+            Your account has been suspended and you cannot place new orders at this time.
+            Please contact support for more information.
+          </p>
+          <div class="suspended-actions">
+            <a href="/" class="btn-ghost">Return to Home</a>
+          </div>
+        </div>
+      } @else if (successOrder(); as order) {
+        <div class="success-panel">
+          <div class="success-icon">
+            <svg class="i" viewBox="0 0 24 24"><path d="m5 13 4 4L19 7"/></svg>
+          </div>
+          <h2>Order Accepted</h2>
+          <div class="order-summary">
+            <div class="summary-row">
+              <span class="label">Order ID</span>
+              <span class="mono accent-text">{{ order.orderId }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Status</span>
+              <span [class]="statusClass(order.status)">{{ order.status }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Symbol</span>
+              <span class="mono symbol-tag">{{ order.symbol }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Side</span>
+              <span [class.positive]="order.side === 'BUY'" [class.negative]="order.side === 'SELL'">
+                {{ order.side }}
+              </span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Quantity</span>
+              <span class="mono">{{ order.quantity | number }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Order Type</span>
+              <span class="mono">{{ order.orderType ?? 'LIMIT' }}</span>
+            </div>
+            <div class="summary-row">
+              <span class="label">Price</span>
+              <span class="mono">{{ money(order.price) }}</span>
+            </div>
+          </div>
+
+          @if (order.orderType === 'MARKET') {
+            <p class="pending-note">
+              This was a market order, so the price above was set by the service from
+              the live book, not by you. The fill settles at the executor's own price.
+            </p>
+          }
+          @if (order.status === 'NEW') {
+            <p class="pending-note">
+              The order is working. Live status is in the
+              <a routerLink="/blotter">Order Blotter</a>.
+            </p>
+          }
+
+          @if (redirectIn() !== null) {
+            <div class="redirect-note" data-testid="redirect-note">
+              <span class="redirect-text">
+                Opening the order blotter in {{ redirectIn() }}s
+              </span>
+              <button type="button" class="btn-ghost btn-small" (click)="holdBlotterRedirect()"
+                      data-testid="hold-redirect">
+                Stay here
+              </button>
+            </div>
+          }
+
+          <div class="success-actions">
+            <button type="button" class="btn-accent" (click)="goToBlotter()"
+                    data-testid="goto-blotter">
+              View in Order Blotter
+            </button>
+            <button type="button" class="btn-ghost" (click)="reset()">Place another order</button>
+          </div>
+        </div>
+      } @else if (!isSuspended()) {
+        @if (errorMessage()) {
+          <div class="error-banner" role="alert">
+            <span class="icon">!</span>
+            <span>{{ errorMessage() }}</span>
+          </div>
+        }
+
+        <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+          <div class="form-group">
+            <label for="account">Trading Account Key</label>
+            <input id="account" formControlName="accountId" readonly />
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="symbol">Instrument Ticker</label>
+              <input
+                id="symbol"
+                type="text"
+                formControlName="symbol"
+                placeholder="AAPL, INFY.NS, FX:EURUSD"
+                style="text-transform:uppercase"
+                maxlength="20"
+                data-testid="symbol-input"
+              />
+              @if (form.controls.symbol.invalid && form.controls.symbol.touched) {
+                <span class="field-error">Enter a valid instrument symbol</span>
+              }
+            </div>
+
+            <div class="form-group">
+              <label for="side">Direction</label>
+              <select id="side" formControlName="side">
+                <option value="BUY">BUY (Long)</option>
+                <option value="SELL">SELL (Short/Close)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>Order Type</label>
+            <div class="segmented order-type" data-testid="order-type-toggle">
+              <button
+                type="button"
+                class="market"
+                [class.active]="orderType() === 'MARKET'"
+                (click)="setOrderType('MARKET')"
+                data-testid="order-type-market"
+              >
+                Market
+              </button>
+              <button
+                type="button"
+                class="limit"
+                [class.active]="orderType() === 'LIMIT'"
+                (click)="setOrderType('LIMIT')"
+                data-testid="order-type-limit"
+              >
+                Limit
+              </button>
+            </div>
+            <span class="field-hint">
+              @if (isMarket()) {
+                Priced by the service from the live book: the ask to buy, the bid to sell,
+                converted into your account currency. You send no price.
+              } @else {
+                Executes only at your price or better.
+              }
+            </span>
+          </div>
+
+          <div class="form-row">
+            <div class="form-group">
+              <label for="quantity">Order Quantity</label>
+              <input
+                id="quantity"
+                type="number"
+                formControlName="quantity"
+                placeholder="100"
+                min="1"
+                step="1"
+                data-testid="quantity-input"
+              />
+              @if (form.controls.quantity.invalid && form.controls.quantity.touched) {
+                <span class="field-error">Quantity must be a positive whole integer</span>
+              }
+            </div>
+
+            @if (!isMarket()) {
+              <div class="form-group">
+                <label for="price">Limit Price ({{ accountCurrency() ?? 'USD' }})</label>
+                <input
+                  id="price"
+                  type="number"
+                  formControlName="price"
+                  placeholder="25.50"
+                  min="0.01"
+                  step="0.01"
+                  data-testid="price-input"
+                />
+                @if (form.controls.price.invalid && form.controls.price.touched) {
+                  <span class="field-error">Price must be greater than zero (max 2 decimals)</span>
+                }
+                @if (displayDiffers() && form.controls.price.value) {
+                  <span class="field-hint" data-testid="price-display">&asymp; {{ money(form.controls.price.value) }} in {{ displayCode() }}</span>
+                }
+                <span class="field-hint">
+                  Current market price:
+                  @if (quoteLoading()) {
+                    <span class="text-muted">Loading…</span>
+                  } @else if (indicativeNativePrice() !== null) {
+                    <span class="mono">{{ currency.formatNative(quoteCurrency() ?? 'USD', indicativeNativePrice()) }}</span>
+                    @if (isForeign() || displayDiffers()) {
+                      <span class="text-muted">/ {{ money(indicativeInAccountCurrency()) }}</span>
+                    }
+                  } @else {
+                    <span class="text-muted">No quote available</span>
+                  }
+                </span>
+              </div>
+            } @else {
+              <!-- No price field for a market order: there is nothing for the
+                   applicant to decide, and sending one would be ignored. -->
+              <div class="form-group market-price-panel">
+                <label>Price ({{ displayCode() }})</label>
+                <div class="server-priced" data-testid="server-priced">
+                  @if (quoteLoading()) {
+                    <span class="text-muted">Reading the live book&hellip;</span>
+                  } @else if (indicativeInAccountCurrency() !== null) {
+                    <span class="mono indicative">
+                      &asymp; {{ money(indicativeInAccountCurrency()) }}
+                    </span>
+                    @if (quote()?.stale) {
+                      <span class="stale-flag">Last known price</span>
+                    }
+                  } @else {
+                    <span class="text-muted">No live quote available</span>
+                  }
+                </div>
+                <span class="field-hint">
+                  Indicative market price. The service sets the final price when the order is submitted.
+                </span>
+              </div>
+            }
+          </div>
+
+
+          @if (summary(); as t) {
+            <section class="trade-summary" aria-labelledby="summary-title" aria-live="polite" data-testid="trade-summary">
+              <header class="ts-head">
+                <h2 id="summary-title" class="ts-title">Order summary</h2>
+                <span class="ts-pill" [class.buy]="t.side === 'BUY'" [class.sell]="t.side === 'SELL'">
+                  {{ t.side }} · {{ t.orderType }}
+                </span>
+              </header>
+
+              <dl class="ts-rows">
+                <div class="ts-row">
+                  <dt>Instrument</dt>
+                  <dd class="mono">{{ t.symbol }} <span class="text-muted">· trades in {{ t.quoteCurrency }}</span></dd>
+                </div>
+                <div class="ts-row">
+                  <dt>Quantity</dt>
+                  <dd class="mono">{{ t.quantity | number }}</dd>
+                </div>
+                <div class="ts-row">
+                  <dt>Market price ({{ t.side === 'BUY' ? 'ask' : 'bid' }})</dt>
+                  <dd class="mono" data-testid="summary-market-price">
+                    @if (t.marketPriceNative !== null) {
+                      {{ nativeMoney(t.quoteCurrency, t.marketPriceNative) }}
+                      @if (t.foreign) { <span class="text-muted">≈ {{ money(t.marketPrice) }}</span> }
+                    } @else if (quoteLoading()) {
+                      <span class="text-muted">loading…</span>
+                    } @else {
+                      <span class="text-muted">no live price</span>
+                    }
+                  </dd>
+                </div>
+                @if (t.orderType === 'LIMIT') {
+                  <div class="ts-row">
+                    <dt>Your limit</dt>
+                    <dd class="mono">
+                      @if (t.unitPrice !== null) {
+                        {{ money(t.unitPrice) }}
+                        @if (t.foreign && t.unitPriceNative !== null) {
+                          <span class="text-muted">≈ {{ nativeMoney(t.quoteCurrency, t.unitPriceNative) }}</span>
+                        }
+                      } @else {
+                        <span class="text-muted">enter a price</span>
+                      }
+                    </dd>
+                  </div>
+                }
+                @if (t.foreign) {
+                  <div class="ts-row">
+                    <dt>Exchange rate</dt>
+                    <dd class="mono" data-testid="summary-fx">
+                      1 {{ t.quoteCurrency }} = {{ t.fxRate | number: '1.2-6' }} {{ accountCurrency() ?? 'USD' }}
+                    </dd>
+                  </div>
+                }
+
+                <div class="ts-row ts-total">
+                  <dt>{{ t.side === 'BUY' ? 'Estimated cost' : 'Estimated proceeds' }}</dt>
+                  <dd class="mono" data-testid="summary-total">
+                    @if (t.total !== null) {
+                      {{ money(t.total) }}
+                      @if (t.foreign && t.totalNative !== null) {
+                        <span class="ts-sub">{{ nativeMoney(t.quoteCurrency, t.totalNative) }}</span>
+                      }
+                    } @else {
+                      <span class="text-muted">—</span>
+                    }
+                  </dd>
+                </div>
+
+                @if (t.cashBefore !== null) {
+                  <div class="ts-row">
+                    <dt>Cash</dt>
+                    <dd class="mono">
+                      {{ money(t.cashBefore) }}
+                      @if (t.cashAfter !== null) {
+                        <span class="ts-arrow" aria-label="becomes">→</span>
+                        <span [class.negative]="t.cashAfter < 0">{{ money(t.cashAfter) }}</span>
+                      }
+                    </dd>
+                  </div>
+                }
+                <div class="ts-row">
+                  <dt>{{ t.symbol }} held</dt>
+                  <dd class="mono">
+                    {{ t.heldBefore | number }}
+                    @if (!t.cashShortfall && !t.holdingShortfall) {
+                      <span class="ts-arrow" aria-label="becomes">→</span> {{ t.heldAfter | number }}
+                    }
+                  </dd>
+                </div>
+                @if (t.realisedPnl !== null) {
+                  <div class="ts-row">
+                    <dt>Est. realised P&amp;L</dt>
+                    <dd class="mono" [class.positive]="t.realisedPnl >= 0" [class.negative]="t.realisedPnl < 0">
+                      {{ t.realisedPnl >= 0 ? '+' : '' }}{{ money(t.realisedPnl) }}
+                    </dd>
+                  </div>
+                }
+              </dl>
+
+              <p class="ts-foot">
+                @if (t.orderType === 'MARKET') {
+                  Estimate at the live {{ t.side === 'BUY' ? 'ask' : 'bid' }}. The executor fills at the price when it executes.
+                } @else {
+                  A limit {{ t.side === 'BUY' ? 'buy fills at your price or lower' : 'sell fills at your price or higher' }}.
+                }
+                @if (displayDiffers()) {
+                  Amounts in {{ displayCode() }}, your display currency; the order settles in {{ accountCurrency() ?? 'USD' }}.
+                } @else {
+                  Amounts in {{ accountCurrency() ?? 'USD' }}, your account currency.
+                }
+              </p>
+            </section>
+          }
+
+          <!--
+            Deliberately not [disabled] on an invalid form. A greyed-out button
+            gives the user nothing to act on; pressing submit marks the fields
+            touched so the reasons appear inline.
+          -->
+          <button
+            type="submit"
+            class="btn-accent submit-btn"
+            [disabled]="loading()"
+            [class.btn-muted]="!canSubmit()"
+            data-testid="submit-order"
+          >
+            @if (loading()) {
+              <span class="spinner" style="width:16px;height:16px"></span>
+              Transmitting order&hellip;
+            } @else if (isMarket()) {
+              <svg class="i i-sm" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
+              Send market order
+            } @else {
+              <svg class="i i-sm" viewBox="0 0 24 24"><path d="M13 2 3 14h7l-1 8 10-12h-7z"/></svg>
+              Submit limit order
+            }
+          </button>
+        </form>
+      }
+    </div>
+  </div>
+</div>

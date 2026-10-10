@@ -1,0 +1,578 @@
+/* Shared by the sign-in and registration screens: one continuous canvas, an animated
+   aurora of slowly drifting colour, with the showcase and a frosted-glass form
+   floating on it. No hard split between the two halves. */
+
+@property --auth-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+
+.auth {
+  /* Aurora palette, dark theme. */
+  --au-base: #020203;
+  --au-1: rgba(190, 20, 44, 0.26);
+  --au-2: rgba(255, 96, 52, 0.1);
+  --au-3: rgba(46, 46, 58, 0.55);
+  --au-4: rgba(255, 190, 70, 0.07);
+  --au-halo: rgba(225, 38, 61, 0.1);
+  --glass: rgba(8, 8, 10, 0.7);
+  --glass-strong: rgba(8, 8, 10, 0.82);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-input: rgba(255, 255, 255, 0.04);
+
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr);
+  background: var(--au-base);
+  overflow: hidden;
+}
+
+:host-context([data-theme='light']) .auth {
+  --au-base: #fbf6f5;
+  --au-1: rgba(225, 38, 61, 0.22);
+  --au-2: rgba(255, 140, 90, 0.24);
+  --au-3: rgba(196, 90, 160, 0.14);
+  --au-4: rgba(255, 201, 60, 0.26);
+  --au-halo: rgba(225, 38, 61, 0.14);
+  --glass: rgba(255, 255, 255, 0.6);
+  --glass-strong: rgba(255, 255, 255, 0.78);
+  --glass-border: rgba(255, 255, 255, 0.9);
+  --glass-input: rgba(255, 255, 255, 0.7);
+}
+
+/* ---- the aurora ---- */
+.aurora {
+  position: absolute;
+  inset: -20%;
+  z-index: -2;
+  filter: blur(70px) saturate(130%);
+  pointer-events: none;
+
+  span {
+    position: absolute;
+    border-radius: 50%;
+    mix-blend-mode: screen;
+    will-change: transform;
+  }
+
+  .a1 {
+    width: 55vw;
+    height: 55vw;
+    left: 5%;
+    top: 0;
+    background: radial-gradient(circle, var(--au-1), transparent 65%);
+    animation: au-float-1 22s ease-in-out infinite alternate;
+  }
+
+  .a2 {
+    width: 45vw;
+    height: 45vw;
+    right: 5%;
+    top: 20%;
+    background: radial-gradient(circle, var(--au-2), transparent 65%);
+    animation: au-float-2 26s ease-in-out infinite alternate;
+  }
+
+  .a3 {
+    width: 60vw;
+    height: 60vw;
+    left: 30%;
+    bottom: -10%;
+    background: radial-gradient(circle, var(--au-3), transparent 65%);
+    animation: au-float-3 30s ease-in-out infinite alternate;
+  }
+
+  .a4 {
+    width: 35vw;
+    height: 35vw;
+    left: 45%;
+    top: 5%;
+    background: radial-gradient(circle, var(--au-4), transparent 65%);
+    animation: au-float-4 18s ease-in-out infinite alternate;
+  }
+}
+
+:host-context([data-theme='light']) .aurora span {
+  mix-blend-mode: multiply;
+}
+
+/* A faint grid and a soft vignette tie the canvas together. */
+.auth::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.035) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.035) 1px, transparent 1px);
+  background-size: 52px 52px;
+  mask-image: radial-gradient(ellipse at 40% 45%, #000 10%, transparent 75%);
+  -webkit-mask-image: radial-gradient(ellipse at 40% 45%, #000 10%, transparent 75%);
+  pointer-events: none;
+}
+
+:host-context([data-theme='light']) .auth::before {
+  background-image:
+    linear-gradient(rgba(27, 15, 17, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(27, 15, 17, 0.04) 1px, transparent 1px);
+}
+
+.auth::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse at center, transparent 55%, rgba(0, 0, 0, 0.45));
+  pointer-events: none;
+}
+
+:host-context([data-theme='light']) .auth::after {
+  background: radial-gradient(ellipse at center, transparent 60%, rgba(179, 18, 42, 0.06));
+}
+
+/* ---- form side ---- */
+.auth-panel {
+  position: relative;
+  isolation: isolate;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 32px;
+  min-height: 100vh;
+  overflow-y: auto;
+
+  /* A soft glow behind the glass, so the form feels lit from within the aurora. */
+  &::before {
+    content: '';
+    position: absolute;
+    z-index: -1;
+    width: min(620px, 90%);
+    aspect-ratio: 1;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--au-halo), transparent 65%);
+    filter: blur(30px);
+    animation: au-breathe 7s ease-in-out infinite alternate;
+    pointer-events: none;
+  }
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 440px;
+  display: flex;
+  flex-direction: column;
+  gap: 22px;
+  animation: auth-rise 0.7s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.auth-card.wide {
+  max-width: 660px;
+}
+
+.auth-mobile-brand {
+  display: none;
+  align-items: center;
+  gap: 12px;
+
+  span {
+    font-size: 22px;
+    font-weight: 900;
+    letter-spacing: -0.02em;
+    background: var(--gradient-accent);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+}
+
+.auth-head {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  h2 {
+    margin: 0;
+    font-size: 34px;
+    font-weight: 900;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+    background: linear-gradient(110deg, var(--text-primary) 30%, var(--accent) 65%, var(--accent-yellow) 100%);
+    background-size: 220% 100%;
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+    animation: auth-sheen 8s ease-in-out infinite alternate;
+  }
+
+  p {
+    margin: 0;
+    font-size: 14.5px;
+    color: var(--text-secondary);
+  }
+}
+
+/* Frosted glass, with a slowly turning gradient edge. */
+.auth-surface {
+  position: relative;
+  padding: 28px;
+  border-radius: 24px;
+  background: var(--glass);
+  backdrop-filter: blur(28px) saturate(150%);
+  -webkit-backdrop-filter: blur(28px) saturate(150%);
+  border: 1px solid var(--glass-border);
+  box-shadow:
+    0 30px 80px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+
+  &::before {
+    content: '';
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient(from var(--auth-angle), transparent 0deg, var(--accent) 70deg,
+      var(--accent-yellow) 120deg, transparent 180deg, transparent 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+    mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+    animation: auth-spin 9s linear infinite;
+    opacity: 0.75;
+    pointer-events: none;
+  }
+}
+
+:host-context([data-theme='light']) .auth-surface {
+  box-shadow:
+    0 24px 60px rgba(179, 18, 42, 0.12),
+    0 2px 8px rgba(27, 15, 17, 0.05),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+/* Inputs and selects sit in the glass rather than on top of it. */
+.auth .form-group input,
+.auth .form-group select {
+  background: var(--glass-input);
+  border-color: var(--glass-border);
+  backdrop-filter: blur(6px);
+
+  &:focus {
+    background: var(--glass-strong);
+  }
+}
+
+:host-context([data-theme='light']) .auth .form-group input,
+:host-context([data-theme='light']) .auth .form-group select {
+  border-color: rgba(179, 18, 42, 0.14);
+}
+
+.auth-form-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* An input with a leading icon and an optional trailing button. */
+.input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+
+  > svg.lead {
+    position: absolute;
+    left: 14px;
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: var(--text-muted);
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+    pointer-events: none;
+    transition: stroke 0.15s;
+  }
+
+  input {
+    padding-left: 44px !important;
+    padding-right: 44px !important;
+    height: 48px;
+    border-radius: 12px !important;
+    font-size: 14.5px !important;
+  }
+
+  &:focus-within > svg.lead {
+    stroke: var(--accent);
+  }
+}
+
+.pw-toggle {
+  position: absolute;
+  right: 6px;
+  width: 36px;
+  height: 36px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--text-muted);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+
+  svg {
+    width: 18px;
+    height: 18px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+    stroke-linecap: round;
+    stroke-linejoin: round;
+  }
+
+  &:hover {
+    color: var(--text-primary);
+    background: var(--surface-tint);
+  }
+}
+
+.caps-hint {
+  font-size: 11.5px;
+  font-weight: 700;
+  color: var(--warning);
+}
+
+/* The primary button shimmers gently, like light across glass. */
+.submit-btn {
+  position: relative;
+  overflow: hidden;
+  width: 100%;
+  height: 50px;
+  font-size: 15px;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: linear-gradient(110deg, #120708, #3d0910 40%, #8e0f22 75%, #c4142c) !important;
+  background-size: 200% 100% !important;
+  animation: auth-sheen 6s ease-in-out infinite alternate;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.55), inset 0 0 0 1px rgba(225, 38, 61, 0.35);
+
+  &::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, 0.28) 50%, transparent 70%);
+    transform: translateX(-120%);
+    transition: transform 0.7s ease;
+  }
+
+  &:hover:not(:disabled)::after {
+    transform: translateX(120%);
+  }
+
+  &:disabled {
+    box-shadow: none;
+  }
+}
+
+.auth-divider {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--text-muted);
+
+  &::before,
+  &::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--border-strong), transparent);
+  }
+}
+
+.alt-btn {
+  width: 100%;
+  height: 46px;
+  border-radius: 13px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  text-decoration: none;
+  font-weight: 700;
+  background: var(--glass) !important;
+  border: 1px solid var(--glass-border) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  transition: border-color 0.2s, transform 0.2s;
+
+  &:hover {
+    border-color: var(--border-hover) !important;
+    transform: translateY(-1px);
+  }
+}
+
+.trust {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  font-size: 11.5px;
+  color: var(--text-muted);
+
+  span {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+
+  svg {
+    width: 14px;
+    height: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-width: 1.8;
+  }
+}
+
+/* ---- motion ---- */
+@keyframes au-float-1 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(14vw, 10vh) scale(1.15); }
+  100% { transform: translate(4vw, 24vh) scale(0.95); }
+}
+
+@keyframes au-float-2 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-16vw, 14vh) scale(1.2); }
+  100% { transform: translate(-6vw, -8vh) scale(1); }
+}
+
+@keyframes au-float-3 {
+  0% { transform: translate(0, 0) scale(1); }
+  50% { transform: translate(-12vw, -14vh) scale(0.9); }
+  100% { transform: translate(10vw, -4vh) scale(1.1); }
+}
+
+@keyframes au-float-4 {
+  0% { transform: translate(0, 0); }
+  100% { transform: translate(-20vw, 30vh); }
+}
+
+@keyframes au-breathe {
+  from { opacity: 0.7; transform: translate(-50%, -50%) scale(0.92); }
+  to { opacity: 1; transform: translate(-50%, -50%) scale(1.06); }
+}
+
+@keyframes auth-sheen {
+  from { background-position: 0% 50%; }
+  to { background-position: 100% 50%; }
+}
+
+@keyframes auth-spin {
+  to { --auth-angle: 360deg; }
+}
+
+@keyframes auth-rise {
+  from {
+    opacity: 0;
+    transform: translateY(16px) scale(0.985);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .aurora span,
+  .auth-card,
+  .auth-head h2,
+  .submit-btn,
+  .auth-surface::before,
+  .auth-panel::before {
+    animation: none;
+  }
+}
+
+@media (max-width: 1080px) {
+  .auth {
+    grid-template-columns: 1fr;
+  }
+
+  app-auth-showcase {
+    display: none;
+  }
+
+  .auth-mobile-brand {
+    display: flex;
+  }
+}
+
+@media (max-width: 480px) {
+  .auth-panel {
+    padding: 28px 16px;
+  }
+
+  .auth-surface {
+    padding: 20px 16px;
+  }
+
+  .auth-head h2 {
+    font-size: 28px;
+  }
+}
+
+/* Forgot password: quiet text links and the rules a new password still needs. */
+.link-btn {
+  background: none;
+  border: 0;
+  padding: 0;
+  color: var(--text-secondary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: transparent;
+  text-underline-offset: 3px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+
+  &:hover,
+  &:focus-visible {
+    color: var(--accent);
+    text-decoration-color: currentColor;
+  }
+}
+
+.forgot-row {
+  display: flex;
+  justify-content: flex-end;
+  margin: -6px 0 14px;
+}
+
+.back-link {
+  display: block;
+  margin: 16px auto 0;
+}
+
+.reset-links {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.pw-rules {
+  margin: 0;
+  padding: 10px 12px 10px 28px;
+  border-radius: 10px;
+  border: 1px dashed var(--border-strong);
+  color: var(--text-secondary);
+  font-size: 0.8rem;
+  display: grid;
+  gap: 2px;
+}

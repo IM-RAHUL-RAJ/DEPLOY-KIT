@@ -1,0 +1,110 @@
+.holdings-page {
+  padding: 28px 32px 48px;
+  max-width: 1400px;
+  margin: 0 auto;
+}
+
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+  margin-bottom: 24px;
+}
+
+.page-title { font-size: 26px; font-weight: 800; letter-spacing: -0.02em; }
+.page-subtitle { font-size: 13px; color: var(--text-secondary); margin-top: 4px; }
+
+.holdings-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  padding: 60px;
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 22px;
+}
+
+.summary-card {
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+
+  &.accent {
+    border-color: var(--border-hover);
+    background: linear-gradient(140deg, var(--accent-dim), var(--bg-card));
+  }
+}
+
+.summary-label {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.summary-value {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+.summary-sub { font-size: 12px; color: var(--text-muted); }
+
+.table-card { padding: 0; }
+
+.card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 20px;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.table-scroll { overflow: auto; }
+
+.symbol-cell { color: var(--text-primary); }
+
+.weight-cell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 130px;
+}
+
+.weight-track {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--panel-tint);
+  border: 1px solid var(--border-color);
+  overflow: hidden;
+}
+
+.weight-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: var(--gradient-brand);
+}
+
+.weight-pct { font-size: 11px; color: var(--text-secondary); width: 50px; text-align: right; }
+
+.empty-row {
+  text-align: center;
+  padding: 46px 20px;
+  color: var(--text-muted);
+  a { color: var(--accent); font-weight: 600; }
+}

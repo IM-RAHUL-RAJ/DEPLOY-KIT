@@ -1,0 +1,4 @@
+# DuckDB ETL pipeline (Sprint 7) - run with: python etl_trigger_service.py
+duckdb>=1.0.0
+psycopg2-binary>=2.9.0
+python-dotenv>=1.0.0

@@ -1,0 +1,35 @@
+{
+  "$schema": "node_modules/@openapitools/openapi-generator-cli/config.schema.json",
+  "spaces": 2,
+  "generator-cli": {
+    "version": "7.9.0",
+    "generators": {
+      "trade-api": {
+        "generatorName": "typescript-angular",
+        "inputSpec": "contracts/trade-api.yaml",
+        "output": "generated/trade-api",
+        "skipValidateSpec": true,
+        "additionalProperties": {
+          "supportsES6": true,
+          "npmName": "trade-api",
+          "withSeparateModelsAndApi": true,
+          "modelPackage": "model",
+          "apiPackage": "api"
+        }
+      },
+      "auth-api": {
+        "generatorName": "typescript-angular",
+        "inputSpec": "contracts/auth-api.yaml",
+        "output": "generated/auth-api",
+        "skipValidateSpec": true,
+        "additionalProperties": {
+          "supportsES6": true,
+          "npmName": "auth-api",
+          "withSeparateModelsAndApi": true,
+          "modelPackage": "model",
+          "apiPackage": "api"
+        }
+      }
+    }
+  }
+}

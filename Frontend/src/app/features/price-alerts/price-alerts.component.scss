@@ -1,0 +1,37 @@
+.alert-form {
+  display: grid;
+  grid-template-columns: minmax(160px, 1.2fr) minmax(150px, 1fr) minmax(150px, 1fr) auto;
+  gap: 16px;
+  align-items: end;
+}
+
+.arm-btn {
+  min-width: 128px;
+  height: 44px;
+}
+
+.symbol-cell {
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 900px) {
+  .alert-form {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 560px) {
+  .alert-form {
+    grid-template-columns: 1fr;
+  }
+}

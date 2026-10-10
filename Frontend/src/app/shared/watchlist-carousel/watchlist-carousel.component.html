@@ -1,0 +1,76 @@
+<div class="wc">
+  <button type="button" class="wc-arrow prev" (click)="scroll(-1)" [class.hidden]="!canPrev()" aria-label="Previous instruments">
+    <svg viewBox="0 0 24 24"><path d="m15 18-6-6 6-6"/></svg>
+  </button>
+
+  <div class="wc-track" #track role="list">
+    @for (item of items(); track item.watchlistInstrumentId) {
+      <article class="wc-card" role="listitem" tabindex="0"
+               [class]="'wc-card ' + direction(item)"
+               [class.selected]="selected() === item.symbol"
+               [class.dragging]="draggingId() === item.watchlistInstrumentId"
+               [attr.aria-label]="item.symbol + (item.currentPrice !== null ? ', ' + item.currentPrice : '')"
+               [attr.draggable]="removable() ? 'true' : null"
+               (dragstart)="dragStart.emit({ item, event: $event })"
+               (dragend)="dragEnd.emit()"
+               (click)="pick.emit(item)" (keydown)="onKey($event, item)">
+        <header class="wc-head">
+          <div class="wc-id">
+            <span class="wc-symbol">{{ item.symbol }}</span>
+            @if (!compact()) {
+              <span class="wc-sub">{{ item.assetClass }}{{ item.ticker && item.ticker !== item.symbol ? ' · ' + item.ticker : '' }}</span>
+            }
+          </div>
+          @if (item.stale) {
+            <span class="wc-stale" title="The last quote is older than the refresh window">Delayed</span>
+          }
+          @if (removable()) {
+            <button type="button" class="wc-remove" (click)="$event.stopPropagation(); remove.emit(item)"
+                    [disabled]="removingId() === item.watchlistInstrumentId"
+                    [attr.aria-label]="'Remove ' + item.symbol + ' from this watchlist'" title="Remove from this watchlist">
+              <svg viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg>
+            </button>
+          }
+        </header>
+
+        <div class="wc-price">
+          @if (item.currentPrice !== null) {
+            <span class="wc-last">{{ item.currentPrice | number: '1.2-2' }}</span>
+            <span class="wc-ccy">{{ item.priceCurrency }}</span>
+          } @else {
+            <span class="wc-last muted">—</span>
+          }
+        </div>
+
+        <div class="wc-change">
+          @if (item.change !== null || item.changePercent !== null) {
+            <span class="wc-delta">
+              {{ direction(item) === 'up' ? '▲' : direction(item) === 'down' ? '▼' : '•' }}
+              @if (item.change !== null) {
+                {{ (item.change > 0 ? '+' : '') + (item.change | number: '1.2-2') }}
+              }
+              @if (item.changePercent !== null) {
+                ({{ (item.changePercent > 0 ? '+' : '') + (item.changePercent | number: '1.2-2') }}%)
+              }
+            </span>
+          } @else {
+            <span class="muted">No change yet</span>
+          }
+        </div>
+
+        <app-sparkline class="wc-spark" [symbol]="item.symbol" [height]="compact() ? 30 : 46" [width]="compact() ? 120 : 200" />
+
+        @if (!compact() && (item.bid !== null || item.ask !== null)) {
+          <footer class="wc-foot">
+            <span>Bid <b>{{ item.bid !== null ? (item.bid | number: '1.2-2') : '—' }}</b></span>
+            <span>Ask <b>{{ item.ask !== null ? (item.ask | number: '1.2-2') : '—' }}</b></span>
+          </footer>
+        }
+      </article>
+    }
+  </div>
+
+  <button type="button" class="wc-arrow next" (click)="scroll(1)" [class.hidden]="!canNext()" aria-label="More instruments">
+    <svg viewBox="0 0 24 24"><path d="m9 18 6-6-6-6"/></svg>
+  </button>
+</div>

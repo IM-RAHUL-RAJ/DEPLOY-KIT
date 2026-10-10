@@ -1,0 +1,524 @@
+openapi: 3.1.0
+
+info:
+  title: Auth service
+  version: 2.0.0
+  summary: Email-verified registration, login, token refresh, logout and current-user lookup for the Enterprise Trading Platform.
+  description: |
+    Binding contract for the NestJS auth service.
+
+    Registration is a two-step, email-verified flow. POST /auth/register validates the
+    profile and emails a six-digit code, but writes nothing to auth.users: the application
+    is held as a pending challenge. POST /auth/register/verify confirms the code and only
+    then creates the user with status INACTIVE plus a matching pending trading
+    account. No tokens are issued by either step, because the account cannot trade until an
+    administrator approves it.
+
+    Login is refused for any user whose status is not ACTIVE. Refresh tokens are delivered
+    as an HttpOnly cookie, so login and refresh responses do not carry the refresh token in
+    the body.
+  contact:
+    name: Enterprise Trading Platform, programme materials
+  license:
+    name: Instructional use only
+
+servers:
+  - url: http://localhost:3000
+    description: Local development.
+  - url: http://auth-service:3000
+    description: Service name inside the Docker Compose network.
+
+tags:
+  - name: Auth
+    description: Email-verified registration, login and token lifecycle.
+  - name: Profile
+    description: The authenticated user.
+
+paths:
+  /auth/register:
+    post:
+      tags: [Auth]
+      operationId: register
+      security: []
+      summary: Start registration and email a one-time code
+      description: |
+        Validates the profile and stores it as a pending challenge, then emails a six-digit
+        code. No user row is created, so an unverified address cannot occupy a username or
+        appear in the admin console.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Challenge stored and a code emailed. No user exists yet.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationStartedResponse'
+        '409':
+          description: The username or email is already taken, or already has a live challenge.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /auth/register/verify:
+    post:
+      tags: [Auth]
+      operationId: verifyRegistration
+      security: []
+      summary: Confirm the emailed code, creating the pending user and account
+      description: |
+        Creates auth.users with status INACTIVE and a matching INACTIVE
+        trading account, credited in the currency derived from the selected country with a
+        zero balance. No tokens are issued until an administrator approves the user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpRequest'
+      responses:
+        '201':
+          description: User and pending account created. No tokens are issued.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationCompletedResponse'
+        '401':
+          description: The code is incorrect, or the address has no live challenge.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: The username or email was claimed by another registration in the meantime.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '410':
+          description: The code has expired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+        '429':
+          description: Too many incorrect codes for this address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register/resend:
+    post:
+      tags: [Auth]
+      operationId: resendRegistrationCode
+      security: []
+      summary: Re-send the verification code for a pending registration
+      description: |
+        Replaces the stored digest with a fresh code and resets the attempt counter. Only
+        the newest code can complete the registration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ResendOtpRequest'
+      responses:
+        '200':
+          description: A new code has been emailed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpDispatchResponse'
+        '404':
+          description: There is no pending registration for that address.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      operationId: login
+      security: []
+      summary: Log in with username or email and password
+      description: |
+        Refused with AUTH-403 unless the user status is ACTIVE, so a pending or suspended
+        user cannot obtain a session. The refresh token is set as an HttpOnly cookie.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated. The refresh token is set as an HttpOnly cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          description: The account is pending approval, suspended or rejected.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      operationId: refresh
+      security: []
+      summary: Rotate a refresh token and issue a new access token
+      description: |
+        The user status is re-checked on every refresh. If it is no longer ACTIVE the token
+        family is revoked, so a suspended user's existing refresh token stops working.
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: A new access token. The rotated refresh token is set as an HttpOnly cookie.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+        '403':
+          description: The account is no longer ACTIVE; the token family has been revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '422':
+          $ref: '#/components/responses/InvalidInput'
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      operationId: logout
+      security: []
+      summary: Revoke the refresh token and clear the session cookie
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Logged out.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
+
+  /auth/me:
+    get:
+      tags: [Profile]
+      operationId: getCurrentUser
+      summary: Get the authenticated user
+      responses:
+        '200':
+          description: The authenticated user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorised'
+
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    Unauthorised:
+      description: Authentication failed.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InvalidInput:
+      description: The request failed field validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+
+  schemas:
+
+    RegisterRequest:
+      type: object
+      additionalProperties: false
+      required:
+        [firstName, lastName, username, email, password, confirmPassword, countryCode, phoneCountryCode, phoneNumber, riskAppetite]
+      properties:
+        firstName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        middleName:
+          type: string
+          maxLength: 100
+          nullable: true
+        lastName:
+          type: string
+          minLength: 1
+          maxLength: 100
+        username:
+          type: string
+          minLength: 3
+          maxLength: 50
+          pattern: '^[a-zA-Z0-9._-]+$'
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        password:
+          type: string
+          minLength: 12
+          maxLength: 128
+          description: At least one lowercase, one uppercase, one digit and one special character.
+          writeOnly: true
+        confirmPassword:
+          type: string
+          writeOnly: true
+        countryCode:
+          type: string
+          minLength: 2
+          maxLength: 2
+          pattern: '^[A-Za-z]{2}$'
+          description: >-
+            ISO 3166-1 alpha-2 country code. The country name and the account currency are
+            both derived from it server-side, so they cannot disagree with each other.
+        phoneCountryCode:
+          type: string
+          maxLength: 8
+          pattern: '^\+?[0-9]{1,5}$'
+          description: Dial code for the selected country, such as +91. Rejected if it does not match.
+        phoneNumber:
+          type: string
+          minLength: 4
+          maxLength: 15
+          pattern: '^[0-9]{4,15}$'
+          description: Digits only, without the country code.
+        riskAppetite:
+          $ref: '#/components/schemas/RiskAppetite'
+
+    VerifyOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [email, code]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+        code:
+          type: string
+          minLength: 6
+          maxLength: 6
+          pattern: '^[0-9]{6}$'
+          description: The six-digit code from the registration email.
+
+    ResendOtpRequest:
+      type: object
+      additionalProperties: false
+      required: [email]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 255
+
+    OtpDispatchResponse:
+      type: object
+      additionalProperties: false
+      required: [message, emailDelivered, expiresInSeconds]
+      properties:
+        message:
+          type: string
+        emailDelivered:
+          type: boolean
+          description: >-
+            False when SMTP is unconfigured, in which case the code was only written to
+            the service log. True in every real deployment.
+        expiresInSeconds:
+          type: integer
+
+    RegistrationStartedResponse:
+      type: object
+      additionalProperties: false
+      required: [message, email, challengeId, expiresInSeconds, emailDelivered]
+      properties:
+        message:
+          type: string
+        email:
+          type: string
+          format: email
+        challengeId:
+          type: integer
+          format: int64
+          description: Opaque handle for the pending challenge. Not a user id.
+        expiresInSeconds:
+          type: integer
+        emailDelivered:
+          type: boolean
+
+    RegistrationCompletedResponse:
+      type: object
+      additionalProperties: false
+      required: [message, user]
+      properties:
+        message:
+          type: string
+        user:
+          allOf:
+            - $ref: '#/components/schemas/UserResponse'
+
+    LoginRequest:
+      type: object
+      additionalProperties: false
+      required: [identifier, password]
+      properties:
+        identifier:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: The username or email address of the account.
+        password:
+          type: string
+          maxLength: 255
+          writeOnly: true
+
+    RefreshRequest:
+      type: object
+      additionalProperties: false
+      properties:
+        refreshToken:
+          type: string
+          description: >-
+            Optional. When omitted the refresh token is read from the HttpOnly
+            refresh_token cookie.
+
+    AuthResponse:
+      type: object
+      additionalProperties: false
+      required: [accessToken, expiresIn, user]
+      properties:
+        accessToken:
+          type: string
+        expiresIn:
+          type: integer
+        user:
+          $ref: '#/components/schemas/UserResponse'
+
+    MessageResponse:
+      type: object
+      additionalProperties: false
+      required: [message]
+      properties:
+        message:
+          type: string
+
+    UserResponse:
+      type: object
+      additionalProperties: false
+      required: [userId, uuid, username, email, roles, status, country, riskAppetite]
+      properties:
+        userId:
+          type: integer
+          format: int64
+        uuid:
+          type: string
+          format: uuid
+        firstName:
+          type: string
+          nullable: true
+        middleName:
+          type: string
+          nullable: true
+        lastName:
+          type: string
+          nullable: true
+        username:
+          type: string
+        email:
+          type: string
+        roles:
+          type: array
+          items:
+            $ref: '#/components/schemas/Role'
+        accountId:
+          type: integer
+          format: int64
+          nullable: true
+        status:
+          $ref: '#/components/schemas/UserStatus'
+        country:
+          type: string
+          description: Country name resolved from countryCode at registration.
+        phoneCountryCode:
+          type: string
+          nullable: true
+        phoneNumber:
+          type: string
+          nullable: true
+        riskAppetite:
+          $ref: '#/components/schemas/RiskAppetite'
+
+    Role:
+      type: string
+      enum: [CUSTOMER, ADMIN]
+
+    UserStatus:
+      type: string
+      enum: [INACTIVE, ACTIVE, SUSPENDED, REJECTED]
+      description: >-
+        Only ACTIVE may sign in or trade. A freshly verified registration is
+        INACTIVE until an administrator approves it.
+
+    RiskAppetite:
+      type: string
+      enum: [CONSERVATIVE, BALANCED, AGGRESSIVE]
+      description: The applicant's stated tolerance for risk.
+
+    ErrorResponse:
+      type: object
+      additionalProperties: false
+      required: [errorCode, message]
+      properties:
+        errorCode:
+          type: string
+          enum: [AUTH-401, AUTH-403, AUTH-404, AUTH-409, AUTH-410, RATE-429, VAL-422, SRV-500]
+        message:
+          type: string
+
+security:
+  - bearerAuth: []
